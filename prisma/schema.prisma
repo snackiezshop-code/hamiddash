@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Room status vocabulary is fixed by the business (see brief) — not a free-form enum in the UI.
+enum RoomStatus {
+  LUNAS // paid this period
+  KOSONG // vacant
+  RUSAK // damaged / out of service
+  TAHUNAN // pays yearly instead of monthly
+  TUNDA_BAYAR // late / unpaid
+}
+
+model Room {
+  id            String       @id @default(cuid())
+  number        Int          @unique // Kamar 1-16
+  monthlyRent   Int // Rp per month, room-specific
+  status        RoomStatus   @default(KOSONG)
+  tenant        Tenant?
+  roomIncomes   RoomIncome[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Tenant {
+  id           String    @id @default(cuid())
+  room         Room      @relation(fields: [roomId], references: [id])
+  roomId       String    @unique
+  name         String
+  phone        String? // WhatsApp-reachable number
+  reminderDay  Int? // day of month (1-31) to send the rent reminder
+  moveInDate   DateTime?
+  leaseEndDate DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// One row per calendar month — the cash-book "sheet".
+model CashPeriod {
+  id                 String              @id @default(cuid())
+  year               Int
+  month              Int // 1-12
+  openingBalance     Int // Saldo Kas Awal, carried from previous period's closing balance
+  roomIncomes        RoomIncome[]
+  additionalIncomes  AdditionalIncome[]
+  expenses           Expense[]
+  transferChecks     TransferCheck[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([year, month])
+}
+
+// Pemasukan Sewa Kamar — one row per room per period.
+model RoomIncome {
+  id           String     @id @default(cuid())
+  period       CashPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId     String
+  room         Room       @relation(fields: [roomId], references: [id])
+  roomId       String
+  status       RoomStatus
+  amount       Int // Nominal actually received this period (0 if kosong/unpaid)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([periodId, roomId])
+}
+
+// Pemasukan Tambahan — ad-hoc extra income line items.
+model AdditionalIncome {
+  id          String     @id @default(cuid())
+  period      CashPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId    String
+  description String
+  source      String?
+  amount      Int
+  createdAt   DateTime   @default(now())
+}
+
+// Pengeluaran Operasional — categorized expenses.
+enum ExpenseCategory {
+  LISTRIK
+  PDAM
+  CLEANING_SERVICE
+  KEBERSIHAN
+  PERBAIKAN
+  INTERNET
+  PERLENGKAPAN
+  ADMINISTRASI
+  PENGURUS
+  BAGI_HASIL
+  LAINNYA
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  period      CashPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId    String
+  category    ExpenseCategory
+  description String
+  amount      Int
+  createdAt   DateTime        @default(now())
+}
+
+// Configurable list of payout recipients (caretaker, profit-share family members, bank).
+model Recipient {
+  id             String          @id @default(cuid())
+  name           String
+  role           String? // e.g. "Pengurus", "Pewaris", "Bank"
+  bankName       String? // e.g. "BSI"
+  accountNumber  String?
+  accountHolder  String? // real name on the bank account
+  isActive       Boolean         @default(true)
+  transferChecks TransferCheck[]
+  createdAt      DateTime        @default(now())
+}
+
+// Transfer checklist — did the payout to this recipient actually go out this period.
+model TransferCheck {
+  id          String     @id @default(cuid())
+  period      CashPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId    String
+  recipient   Recipient  @relation(fields: [recipientId], references: [id])
+  recipientId String
+  isSent      Boolean    @default(false)
+  amount      Int?
+  sentAt      DateTime?
+
+  @@unique([periodId, recipientId])
+}
+
+// General task tracking (cleaning, maintenance, admin) — separate from the monthly transfer checklist.
+model ChecklistItem {
+  id          String    @id @default(cuid())
+  title       String
+  category    String? // e.g. Cleaning, Maintenance, Admin
+  isDone      Boolean   @default(false)
+  dueDate     DateTime?
+  roomId      String? // optional link to a specific room
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+}

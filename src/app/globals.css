@@ -1,26 +1,98 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-cream: #f6f1e5;
+  --color-cream-2: #ece5d3;
+  --color-ink: #17140f;
+  --color-ink-soft: #5c554a;
+  --color-line: #e2d9c4;
+
+  --color-mint: #cfe8d2;
+  --color-mint-deep: #2e6b45;
+  --color-blush: #f6cbc2;
+  --color-blush-deep: #a23b2b;
+  --color-butter: #f6de93;
+  --color-butter-deep: #8a6a12;
+  --color-peri: #cdd6f3;
+  --color-peri-deep: #34428c;
+
+  --font-display: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-fira-code), ui-monospace, monospace;
+  --font-greeting: var(--font-dm-serif), Georgia, serif;
+
+  /* Type scale: 13 / 16 / 17 / 20 / 24 / 28 / 32 / 40 — body text never below 16px */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.625rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 3rem;
+
+  --radius-card: 24px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@utility card {
+  @apply rounded-[24px] p-5;
+}
+@utility btn {
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 min-h-11 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors duration-200 disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-ink text-cream hover:bg-ink/85;
+}
+@utility btn-secondary {
+  @apply btn border border-ink/20 bg-cream text-ink hover:bg-cream-2;
+}
+@utility btn-sm {
+  @apply min-h-9 px-4 py-1.5 text-xs;
+}
+@utility pill {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;
+}
+@utility field {
+  @apply w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-ink;
+}
+@utility label {
+  @apply mb-1.5 block text-xs font-semibold tracking-wide text-ink-soft uppercase;
+}
+@utility h-display {
+  @apply font-display font-bold tracking-tight;
 }
