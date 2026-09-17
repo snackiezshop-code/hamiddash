@@ -2,9 +2,10 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider      = "prisma-client"
-  output        = "../src/generated/prisma"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  provider   = "prisma-client"
+  output     = "../src/generated/prisma"
+  // JS query engine + pg adapter: no native binary to ship to Vercel.
+  engineType = "client"
 }
 
 datasource db {
