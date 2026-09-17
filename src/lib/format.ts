@@ -39,9 +39,18 @@ export function shiftMonth(year: number, month: number, delta: number) {
   return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
 }
 
+export const TZ = "Asia/Jakarta";
+
 export function formatDate(d: Date | null | undefined) {
   if (!d) return "—";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: TZ });
+}
+
+// "Today" for business logic (new month rollover, reminder days, overdue checks) must follow
+// Jakarta's calendar date, not the server process's — Vercel runs functions in UTC.
+export function todayJakarta() {
+  const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  return new Date(`${ymd}T00:00:00.000Z`);
 }
 
 export function dateInputValue(d: Date | null | undefined) {

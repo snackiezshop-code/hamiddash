@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayJakarta } from "@/lib/format";
 import { addChecklistItem, deleteChecklistItem, toggleChecklistItem } from "@/app/actions";
 import { Empty, PageHeader, Section } from "@/components/ui";
 import { ConfirmButton, SubmitButton } from "@/components/forms";
@@ -20,8 +20,7 @@ export default async function ChecklistPage() {
   const roomNo = new Map(rooms.map((r) => [r.id, r.number]));
   const open = items.filter((i) => !i.isDone);
   const done = items.filter((i) => i.isDone).slice(0, 20);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayJakarta();
 
   const Row = ({ item }: { item: (typeof items)[number] }) => {
     const overdue = !item.isDone && item.dueDate && item.dueDate < today;

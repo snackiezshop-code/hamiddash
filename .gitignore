@@ -43,6 +43,7 @@ next-env.d.ts
 /src/generated/prisma
 
 # local data
+prisma/data-export.json
 /prisma/dev.db*
 *.xlsx
 *.tiff

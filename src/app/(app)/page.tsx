@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getLatestPeriod, summarize } from "@/lib/cashbook";
 import {
-  STATUS_TONE, TONE_CLASS, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort,
+  STATUS_TONE, TONE_CLASS, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, todayJakarta,
 } from "@/lib/format";
 import { markRoomPaid, startPeriod, toggleTransfer } from "@/app/actions";
 import { Donut, Empty, MiniBars, PageHeader, Section, Sparkline, StatCard, StatusPill, WaButton } from "@/components/ui";
@@ -12,7 +12,7 @@ import { RoomSearch } from "@/components/room-search";
 import { IconAlert, IconCalendar, IconCheck, IconDoor, IconWallet } from "@/components/icons";
 
 export default async function DashboardPage() {
-  const now = new Date();
+  const now = todayJakarta();
   const [latest, rooms, periods, openTasks] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: { tenant: true } }),
@@ -23,8 +23,8 @@ export default async function DashboardPage() {
     db.checklistItem.findMany({ where: { isDone: false }, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], take: 5 }),
   ]);
 
-  const curYear = now.getFullYear();
-  const curMonth = now.getMonth() + 1;
+  const curYear = now.getUTCFullYear();
+  const curMonth = now.getUTCMonth() + 1;
   const needsNewPeriod = !latest || latest.year * 12 + latest.month < curYear * 12 + curMonth;
 
   const summary = latest ? summarize(latest) : null;
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   const occupied = rooms.filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK").length;
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
   const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
-  const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getDate());
+  const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
   const counts = {
     lunas: rooms.filter((r) => r.status === "LUNAS").length,
     tahunan: rooms.filter((r) => r.status === "TAHUNAN").length,
@@ -41,6 +41,7 @@ export default async function DashboardPage() {
   };
 
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const startOfTodayForOverdue = now;
   const endingLeases = rooms
     .filter((r) => r.tenant?.leaseEndDate && r.tenant.leaseEndDate <= soon)
     .sort((a, b) => a.tenant!.leaseEndDate!.getTime() - b.tenant!.leaseEndDate!.getTime());
@@ -48,8 +49,6 @@ export default async function DashboardPage() {
   const label = latest ? periodLabel(latest.year, latest.month) : "";
   const transfersDone = latest?.transferChecks.filter((t) => t.isSent).length ?? 0;
 
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
   const latestSlug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
   const dueTodayIds = new Set(dueToday.map((d) => d.id));
   const notifications: Notification[] = [
@@ -77,7 +76,7 @@ export default async function DashboardPage() {
       detail: `${r.tenant!.name} · ${formatDate(r.tenant!.leaseEndDate)}`,
       href: `/kamar/${r.number}`,
     })),
-    ...openTasks.filter((t) => t.dueDate && t.dueDate < startOfToday).map((t) => ({
+    ...openTasks.filter((t) => t.dueDate && t.dueDate < startOfTodayForOverdue).map((t) => ({
       id: `task-${t.id}`, tone: "blush" as const,
       title: `Overdue task`,
       detail: `${t.title} · due ${formatDate(t.dueDate)}`,

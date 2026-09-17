@@ -219,7 +219,7 @@ export default async function CashPeriodPage({ params }: PageProps<"/kas/[period
                           Transfer to {t.recipient.name}
                           {t.recipient.role && <span className="ml-1.5 text-xs opacity-70">· {t.recipient.role}</span>}
                         </span>
-                        {t.sentAt && <span className="num text-xs">{t.sentAt.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                        {t.sentAt && <span className="num text-xs">{t.sentAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}</span>}
                       </button>
                     </form>
                     <span className="pl-11 sm:pl-0">
