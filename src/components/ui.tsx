@@ -16,7 +16,7 @@ export function PageHeader({ title, subtitle, actions, titleClassName = "font-gr
 }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[14rem] flex-1">
         <h1 className={titleClassName}>{title}</h1>
         {subtitle && <div className="mt-1 text-sm text-ink-soft">{subtitle}</div>}
       </div>
@@ -34,7 +34,7 @@ export function StatCard({ tone, icon, label, value, footer, chart }: {
   chart?: ReactNode;
 }) {
   return (
-    <div className={`card flex min-h-40 flex-col ${TONE_CLASS[tone]}`}>
+    <div className={`card flex min-h-40 min-w-0 flex-col ${TONE_CLASS[tone]}`}>
       <div className="flex items-start justify-between gap-3">
         <span className={`grid h-10 w-10 place-items-center rounded-full ${tone === "ink" ? "bg-cream text-ink" : "bg-white/70"}`}>
           {icon}
@@ -43,7 +43,7 @@ export function StatCard({ tone, icon, label, value, footer, chart }: {
       </div>
       <div className="mt-auto pt-4">
         <div className="text-xs font-semibold tracking-wide uppercase opacity-75">{label}</div>
-        <div className="num mt-1 text-2xl font-semibold tracking-tight md:text-3xl">{value}</div>
+        <div className="num mt-1 text-2xl font-semibold tracking-tight break-words md:text-3xl">{value}</div>
         {footer && <div className="mt-2 text-xs">{footer}</div>}
       </div>
     </div>

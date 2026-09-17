@@ -65,7 +65,7 @@ export default async function CashPeriodPage({ params }: PageProps<"/kas/[period
           <a href={`/kas/${slug}/report`} className="btn-secondary btn-sm"><IconDownload width={16} height={16} /> Download PDF</a>
         </>} />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard tone="white" icon={<IconWallet />} label="Opening balance" value={rupiah(s.openingBalance)}
           footer={<span className="text-ink-soft">Closing balance of {periodLabel(prev.year, prev.month)}</span>} />
         <StatCard tone="mint" icon={<IconCheck />} label="Income" value={rupiah(s.incomeTotal)}
