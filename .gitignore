@@ -53,3 +53,4 @@ prisma/data-export.json
 lg-*.png
 .DS_Store
 !.env.example
+*.zip

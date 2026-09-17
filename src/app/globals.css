@@ -16,10 +16,18 @@
   --color-peri: #cdd6f3;
   --color-peri-deep: #34428c;
 
-  --font-display: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-fira-code), ui-monospace, monospace;
-  --font-greeting: var(--font-dm-serif), Georgia, serif;
+  /* Mobile refresh accents (sampled from the reference): sage info bar, FAB pink, inline emphasis red.
+     Flag is darker than the brief's #E15241 so large text on blush clears WCAG AA (3.58:1). */
+  --color-sage: #a0b06c;
+  --color-fab: #f5badc;
+  --color-flag: #c43a26;
+  /* Off-state switch track: 3.4:1 against its white knob, 3:1 against cream. */
+  --color-track: #8f8a80;
+
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-greeting: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 
   /* Type scale: 13 / 16 / 17 / 20 / 24 / 28 / 32 / 40 — body text never below 16px */
   --text-xs: 0.8125rem;
@@ -82,7 +90,7 @@ body {
   @apply btn border border-ink/20 bg-cream text-ink hover:bg-cream-2;
 }
 @utility btn-sm {
-  @apply min-h-9 px-4 py-1.5 text-xs;
+  @apply min-h-11 px-4 py-1.5 text-xs md:min-h-9;
 }
 @utility pill {
   @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;

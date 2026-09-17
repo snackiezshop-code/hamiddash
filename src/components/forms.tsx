@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
 
 export function SubmitButton({ children, className = "btn-primary", pendingText, ...rest }: ComponentProps<"button"> & { pendingText?: string }) {
@@ -9,15 +9,6 @@ export function SubmitButton({ children, className = "btn-primary", pendingText,
     <button type="submit" disabled={pending} className={className} {...rest}>
       {pending && pendingText ? pendingText : children}
     </button>
-  );
-}
-
-export function AutoSubmitSelect({ children, ...rest }: ComponentProps<"select"> & { children: ReactNode }) {
-  const { pending } = useFormStatus();
-  return (
-    <select {...rest} disabled={pending} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
-      {children}
-    </select>
   );
 }
 
@@ -37,7 +28,11 @@ export function AutoSubmitAmount({ defaultValue, ...rest }: ComponentProps<"inpu
 }
 
 // Two-step inline confirm; native confirm() is silently blocked in some embedded browsers.
-export function ConfirmButton({ message, children, className, ...rest }: ComponentProps<"button"> & { message: string }) {
+export function ConfirmButton({ message, children, className, confirmText = "Delete?", pendingText = "Deleting…", ...rest }: ComponentProps<"button"> & {
+  message: string;
+  confirmText?: string;
+  pendingText?: string;
+}) {
   const [armed, setArmed] = useState(false);
   const { pending } = useFormStatus();
 
@@ -57,8 +52,8 @@ export function ConfirmButton({ message, children, className, ...rest }: Compone
         title={message}
         aria-label={message}
         onBlur={() => setArmed(false)}
-        className="pill cursor-pointer bg-blush-deep py-1.5 text-white hover:bg-blush-deep/85">
-        {pending ? "Deleting…" : "Delete?"}
+        className="pill min-h-11 cursor-pointer bg-blush-deep px-4 text-white hover:bg-blush-deep/85 md:min-h-9">
+        {pending ? pendingText : confirmText}
       </button>
     );
   }

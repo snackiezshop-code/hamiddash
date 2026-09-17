@@ -5,11 +5,12 @@ import {
   STATUS_TONE, TONE_CLASS, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, todayJakarta,
 } from "@/lib/format";
 import { markRoomPaid, startPeriod, toggleTransfer } from "@/app/actions";
-import { Donut, Empty, MiniBars, PageHeader, Section, Sparkline, StatCard, StatusPill, WaButton } from "@/components/ui";
+import { Empty, MiniBars, PageHeader, Section, Sparkline, StatCard, StatusPill, WaButton } from "@/components/ui";
+import { AlertCallout, Avatar, Chevron, CountPill, IconBadge, ListRow, OCCUPANCY_SEGMENTS, PASTEL_BG, SegmentedRing, taskCategoryMeta } from "@/components/kit";
 import { SubmitButton } from "@/components/forms";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
 import { RoomSearch } from "@/components/room-search";
-import { IconAlert, IconCalendar, IconCheck, IconDoor, IconWallet } from "@/components/icons";
+import { IconCalendar, IconCheck, IconWallet } from "@/components/icons";
 
 export default async function DashboardPage() {
   const now = todayJakarta();
@@ -129,21 +130,43 @@ export default async function DashboardPage() {
             footer={<span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
               {summary.netFlow >= 0 ? "+" : ""}{rupiahShort(summary.netFlow)} this month
             </span>} />
-          <StatCard tone="mint" icon={<IconDoor />} label="Rooms occupied" value={`${occupied} / ${rooms.length}`}
-            chart={<Donut value={occupied} total={rooms.length} />}
-            footer={`${counts.kosong} vacant · ${counts.rusak} damaged · ${counts.tahunan} annual`} />
+          <section className="card flex flex-col items-center gap-3 bg-white sm:row-span-2 xl:row-span-1" aria-labelledby="occupancy-title">
+            <h2 id="occupancy-title" className="self-start text-xs font-semibold tracking-wide text-ink-soft uppercase">Rooms occupied</h2>
+            <SegmentedRing size={168} center={`${Math.round((occupied / Math.max(rooms.length, 1)) * 100)}%`}
+              caption={`${occupied} of ${rooms.length} rooms`}
+              segments={[
+                { key: "occupied", value: occupied, ...OCCUPANCY_SEGMENTS.occupied },
+                { key: "vacant", value: counts.kosong, ...OCCUPANCY_SEGMENTS.vacant },
+                { key: "damaged", value: counts.rusak, ...OCCUPANCY_SEGMENTS.damaged },
+              ]} />
+            <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs">
+              {([["occupied", occupied], ["vacant", counts.kosong], ["damaged", counts.rusak]] as const).map(([k, n]) => (
+                <li key={k} className="flex items-center gap-1.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${PASTEL_BG[OCCUPANCY_SEGMENTS[k].tone]}`} aria-hidden />
+                  <span className="num font-semibold">{n}</span> {OCCUPANCY_SEGMENTS[k].label.toLowerCase()}
+                </li>
+              ))}
+            </ul>
+          </section>
           <StatCard tone="peri" icon={<IconCheck />} label={`Income ${label}`} value={rupiah(summary.incomeTotal)}
             chart={<MiniBars parts={[
               { value: summary.incomeTotal, className: "bg-peri-deep" },
               { value: summary.expenseTotal, className: "bg-peri-deep/30" },
             ]} />}
             footer={`Expenses ${rupiah(summary.expenseTotal)}`} />
-          <StatCard tone="blush" icon={<IconAlert />} label="Unpaid" value={`${unpaid.length} ${unpaid.length === 1 ? "room" : "rooms"}`}
-            footer={unpaid.length ? `± ${rupiah(unpaidTotal)} still to collect` : "All rent collected"} />
+          {unpaid.length > 0 ? (
+            <AlertCallout eyebrow="Needs attention"
+              action={<a href="#unpaid" className="btn-primary btn-sm">See who hasn&apos;t paid</a>}>
+              <span className="text-flag">{unpaid.length}</span> {unpaid.length === 1 ? "room hasn't" : "rooms haven't"} paid for {label}
+              <span className="mt-1 block font-sans text-sm font-semibold text-ink-soft">{rupiah(unpaidTotal)} still to collect</span>
+            </AlertCallout>
+          ) : (
+            <AlertCallout tone="mint" eyebrow="Rent">All rent for {label} is in.</AlertCallout>
+          )}
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Section title="Room status" action={<Link href="/kamar" className="text-sm font-semibold underline-offset-4 hover:underline">Manage</Link>}>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {rooms.map((r) => (
@@ -153,50 +176,56 @@ export default async function DashboardPage() {
                   <span className="h-display text-lg">R{r.number}</span>
                   <StatusPill status={r.status} />
                 </div>
-                <div className="mt-2 truncate text-xs font-semibold">{r.tenant?.name ?? "—"}</div>
+                <div className="mt-2 truncate text-xs font-semibold">{r.tenant?.name ?? "No tenant"}</div>
                 <div className="num text-xs opacity-75">{rupiahShort(r.monthlyRent)}</div>
               </Link>
             ))}
           </div>
         </Section>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {dueToday.length > 0 && (
-            <Section title="Reminders due today" action={<span className="pill bg-butter text-butter-deep">{dueToday.length}</span>}>
+            <Section title="Reminders due today" action={<CountPill n={dueToday.length} />}>
               <ul className="divide-y divide-line">
                 {dueToday.map((inc) => (
-                  <li key={inc.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                    <div>
-                      <div className="text-sm font-semibold">Room {inc.room.number} · {inc.room.tenant?.name}</div>
-                      <div className="num text-xs text-ink-soft">{rupiah(inc.room.monthlyRent)}</div>
-                    </div>
-                    <WaButton phone={inc.room.tenant?.phone} label="Remind"
-                      text={reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month)} />
+                  <li key={inc.id}>
+                    <ListRow
+                      leading={<Avatar name={inc.room.tenant?.name ?? "?"} tone="butter" />}
+                      title={`Room ${inc.room.number} · ${inc.room.tenant?.name ?? "No tenant"}`}
+                      subtitle={<span className="num">{rupiah(inc.room.monthlyRent)}</span>}
+                      trailing={<WaButton iconOnly phone={inc.room.tenant?.phone} label={`Remind ${inc.room.tenant?.name ?? "tenant"} on WhatsApp`}
+                        text={reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month)} />} />
                   </li>
                 ))}
               </ul>
             </Section>
           )}
 
-          <Section title="Unpaid rent">
+          <Section title="Unpaid rent" action={unpaid.length > 0 ? <CountPill n={unpaid.length} /> : undefined}>
+            <div id="unpaid" className="scroll-mt-4" />
             {unpaid.length === 0 ? (
               <Empty>No unpaid rent for {label}.</Empty>
             ) : (
               <ul className="divide-y divide-line">
                 {unpaid.map((inc) => (
-                  <li key={inc.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                    <div>
-                      <div className="text-sm font-semibold">Room {inc.room.number} · {inc.room.tenant?.name ?? "no tenant name"}</div>
-                      <div className="num text-xs text-ink-soft">{rupiah(inc.room.monthlyRent)}</div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <WaButton phone={inc.room.tenant?.phone} label="Remind"
-                        text={reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month)} />
-                      <form action={markRoomPaid}>
-                        <input type="hidden" name="incomeId" value={inc.id} />
-                        <SubmitButton className="btn-primary btn-sm" pendingText="…">Mark paid</SubmitButton>
-                      </form>
-                    </div>
+                  <li key={inc.id}>
+                    <ListRow
+                      leading={<Avatar name={inc.room.tenant?.name ?? "?"} tone="blush" />}
+                      title={`Room ${inc.room.number} · ${inc.room.tenant?.name ?? "No tenant"}`}
+                      subtitle={<span className="num">{rupiah(inc.room.monthlyRent)}</span>}
+                      trailing={
+                        <div className="flex shrink-0 gap-2">
+                          <WaButton iconOnly phone={inc.room.tenant?.phone} label={`Remind ${inc.room.tenant?.name ?? "tenant"} on WhatsApp`}
+                            text={reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month)} />
+                          <form action={markRoomPaid}>
+                            <input type="hidden" name="incomeId" value={inc.id} />
+                            <SubmitButton className="grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-ink text-cream hover:bg-ink/85 disabled:opacity-50"
+                              aria-label={`Mark room ${inc.room.number} paid`} title="Mark paid">
+                              <IconCheck width={18} height={18} strokeWidth={3} />
+                            </SubmitButton>
+                          </form>
+                        </div>
+                      } />
                   </li>
                 ))}
               </ul>
@@ -224,26 +253,35 @@ export default async function DashboardPage() {
             <Section title="Leases ending soon">
               <ul className="divide-y divide-line">
                 {endingLeases.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-2 py-2.5">
-                    <Link href={`/kamar/${r.number}`} className="text-sm font-semibold">Room {r.number} · {r.tenant!.name}</Link>
-                    <span className={`pill ${r.tenant!.leaseEndDate! < now ? "bg-blush text-blush-deep" : "bg-butter text-butter-deep"}`}>
-                      {formatDate(r.tenant!.leaseEndDate)}
-                    </span>
+                  <li key={r.id}>
+                    <Link href={`/kamar/${r.number}`} className="block">
+                      <ListRow
+                        leading={<Avatar name={r.tenant!.name} tone={r.tenant!.leaseEndDate! < now ? "blush" : "butter"} />}
+                        title={`Room ${r.number} · ${r.tenant!.name}`}
+                        subtitle={<span className="num">{r.tenant!.leaseEndDate! < now ? "Ended" : "Ends"} {formatDate(r.tenant!.leaseEndDate)}</span>}
+                        trailing={<Chevron />} />
+                    </Link>
                   </li>
                 ))}
               </ul>
             </Section>
           )}
 
-          <Section title="Open tasks" action={<Link href="/checklist" className="text-sm font-semibold underline-offset-4 hover:underline">View all</Link>}>
+          <Section title="Open tasks" action={<Link href="/checklist" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">View all</Link>}>
             {openTasks.length === 0 ? <Empty>No open tasks.</Empty> : (
-              <ul className="space-y-2">
-                {openTasks.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between gap-2 rounded-2xl bg-cream px-3 py-2 text-sm">
-                    <span className="font-medium">{t.title}</span>
-                    {t.dueDate && <span className="num text-xs text-ink-soft">{formatDate(t.dueDate)}</span>}
-                  </li>
-                ))}
+              <ul className="divide-y divide-line">
+                {openTasks.map((t) => {
+                  const meta = taskCategoryMeta(t.category);
+                  return (
+                    <li key={t.id}>
+                      <ListRow
+                        leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
+                        title={t.title}
+                        subtitle={t.category ?? undefined}
+                        trailing={t.dueDate ? <span className="num shrink-0 text-xs text-ink-soft">{formatDate(t.dueDate)}</span> : undefined} />
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Section>

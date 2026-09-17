@@ -42,7 +42,7 @@ export function shiftMonth(year: number, month: number, delta: number) {
 export const TZ = "Asia/Jakarta";
 
 export function formatDate(d: Date | null | undefined) {
-  if (!d) return "—";
+  if (!d) return "Not set";
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: TZ });
 }
 

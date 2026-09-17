@@ -1,45 +1,74 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { db } from "@/lib/db";
 import { getPeriod, summarize } from "@/lib/cashbook";
 import {
-  CATEGORY_LABEL, CATEGORY_OPTIONS, STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
+  CATEGORY_LABEL, STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
   parsePeriodSlug, periodLabel, periodSlug, reminderText, rupiah, shiftMonth,
 } from "@/lib/format";
 import {
-  addAdditionalIncome, addExpense, deleteAdditionalIncome, deleteExpense, startPeriod, toggleTransfer, updateRoomIncome,
+  addAdditionalIncome, deleteAdditionalIncome, deleteExpense, startPeriod, toggleTransfer, updateRoomIncome,
 } from "@/app/actions";
 import { Empty, PageHeader, Section, StatCard, WaButton } from "@/components/ui";
 import { BankAccount } from "@/components/bank";
-import { AutoSubmitAmount, AutoSubmitSelect, ConfirmButton, SubmitButton } from "@/components/forms";
+import { AutoSubmitAmount, ConfirmButton, SubmitButton } from "@/components/forms";
+import { Avatar, CountPill, IconBadge, ListRow, EXPENSE_META, SegmentedLinks, STATUS_PASTEL } from "@/components/kit";
+import { SelectPill, SwitchSubmit } from "@/components/kit-client";
+import { MonthSelect } from "@/components/month-select";
+import { QuickAddButton } from "@/components/quick-add";
 import {
   IconAlert, IconCheck, IconChevronLeft, IconChevronRight, IconDownload, IconPlus, IconTrash, IconWallet,
 } from "@/components/icons";
 
-export default async function CashPeriodPage({ params }: PageProps<"/kas/[period]">) {
+const TABS = [
+  { key: "summary", label: "Summary" },
+  { key: "rent", label: "Rent" },
+  { key: "expenses", label: "Expenses" },
+  { key: "transfers", label: "Transfers" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+
+export default async function CashPeriodPage({ params, searchParams }: PageProps<"/kas/[period]">) {
   const { period: slug } = await params;
+  const { tab: tabParam } = await searchParams;
   const ym = parsePeriodSlug(slug);
   if (!ym) notFound();
   const { year, month } = ym;
+  const tab: Tab = TABS.some((t) => t.key === tabParam) ? (tabParam as Tab) : "summary";
   const label = periodLabel(year, month);
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
-  const period = await getPeriod(year, month);
+  const [period, allPeriods] = await Promise.all([
+    getPeriod(year, month),
+    db.cashPeriod.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }], select: { year: true, month: true } }),
+  ]);
 
+  const monthOptions = allPeriods.map((p) => ({ value: periodSlug(p.year, p.month), label: periodLabel(p.year, p.month) }));
+  if (!monthOptions.some((o) => o.value === slug)) {
+    monthOptions.unshift({ value: slug, label: `${label} (not started)` });
+  }
+
+  // Phones pick a month from the pill; desktop keeps the arrow stepper.
   const nav = (
-    <div className="flex items-center gap-1">
-      <Link href={`/kas/${periodSlug(prev.year, prev.month)}`} className="btn-secondary btn-sm" aria-label="Previous month">
-        <IconChevronLeft width={16} height={16} />
-      </Link>
-      <Link href={`/kas/${periodSlug(next.year, next.month)}`} className="btn-secondary btn-sm" aria-label="Next month">
-        <IconChevronRight width={16} height={16} />
-      </Link>
-    </div>
+    <>
+      <div className="flex w-full md:hidden">
+        <MonthSelect options={monthOptions} value={slug} tab={tab} />
+      </div>
+      <div className="hidden items-center gap-1 md:flex">
+        <Link href={`/kas/${periodSlug(prev.year, prev.month)}`} className="btn-secondary btn-sm" aria-label="Previous month">
+          <IconChevronLeft width={16} height={16} />
+        </Link>
+        <Link href={`/kas/${periodSlug(next.year, next.month)}`} className="btn-secondary btn-sm" aria-label="Next month">
+          <IconChevronRight width={16} height={16} />
+        </Link>
+      </div>
+    </>
   );
 
   if (!period) {
     return (
       <>
-        <PageHeader title="Cash Book" subtitle={label} actions={nav} />
+        <PageHeader title="Cash Book" subtitle={label} actions={nav} actionsClassName="w-full md:w-auto" />
         <form action={startPeriod} className="card bg-white text-center">
           <input type="hidden" name="year" value={year} />
           <input type="hidden" name="month" value={month} />
@@ -56,16 +85,25 @@ export default async function CashPeriodPage({ params }: PageProps<"/kas/[period
   const s = summarize(period);
   const paidCount = period.roomIncomes.filter((r) => r.status === "LUNAS").length;
   const transfers = period.transferChecks.filter((t) => t.recipient.isActive || t.isSent);
+  // On phones only the chosen tab's sections show; from md up everything shows as before.
+  const on = (key: Tab, grid = false) =>
+    tab === key ? (grid ? "grid" : "block") : grid ? "hidden md:grid" : "hidden md:block";
 
   return (
     <>
-      <PageHeader title="Cash Book" subtitle={`Cash flow report · ${label}`}
+      <PageHeader title="Cash Book" subtitle={`Cash flow report · ${label}`} actionsClassName="w-full md:w-auto"
         actions={<>
           {nav}
           <a href={`/kas/${slug}/report`} className="btn-secondary btn-sm"><IconDownload width={16} height={16} /> Download PDF</a>
         </>} />
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 md:hidden">
+        <SegmentedLinks label="Cash book sections" items={TABS.map((t) => ({
+          href: `/kas/${slug}?tab=${t.key}`, label: t.label, active: tab === t.key,
+        }))} />
+      </div>
+
+      <div className={`mb-6 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${on("summary", true)}`}>
         <StatCard tone="white" icon={<IconWallet />} label="Opening balance" value={rupiah(s.openingBalance)}
           footer={<span className="text-ink-soft">Closing balance of {periodLabel(prev.year, prev.month)}</span>} />
         <StatCard tone="mint" icon={<IconCheck />} label="Income" value={rupiah(s.incomeTotal)}
@@ -78,32 +116,35 @@ export default async function CashPeriodPage({ params }: PageProps<"/kas/[period
           </span>} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr]">
-        <Section title="Room rent income" action={<span className="pill bg-mint text-mint-deep">{paidCount}/{period.roomIncomes.length} paid</span>}>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <Section title="Room rent income" className={on("rent")}
+          action={<span className="pill bg-mint text-mint-deep">{paidCount}/{period.roomIncomes.length} paid</span>}>
           <ul className="divide-y divide-line">
             {period.roomIncomes.map((inc) => {
               const tenant = inc.room.tenant;
               return (
                 <li key={`${inc.id}-${inc.status}-${inc.amount}`}>
-                  <form action={updateRoomIncome} className="flex flex-wrap items-center gap-2 py-2">
+                  <form action={updateRoomIncome} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
                     <input type="hidden" name="incomeId" value={inc.id} />
-                    <div className="w-28 min-w-0 flex-1 sm:flex-none">
-                      <Link href={`/kamar/${inc.room.number}`} className="font-display font-bold hover:underline">Room {inc.room.number}</Link>
-                      <div className="truncate text-xs text-ink-soft">{tenant?.name ?? "—"}</div>
-                    </div>
-                    <AutoSubmitSelect name="status" defaultValue={inc.status} aria-label={`Status of room ${inc.room.number}`}
-                      className={`pill cursor-pointer appearance-none border-0 py-1.5 pr-3 outline-none ${TONE_CLASS[STATUS_TONE[inc.status]]}`}>
-                      {STATUS_OPTIONS.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}
-                    </AutoSubmitSelect>
-                    <div className="ml-auto flex items-center gap-2">
+                    <Link href={`/kamar/${inc.room.number}`} className="flex min-w-0 flex-1 items-center gap-3">
+                      <Avatar name={tenant?.name ?? String(inc.room.number)} tone={STATUS_PASTEL[inc.status]} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">Room {inc.room.number}</span>
+                        <span className="block truncate text-xs text-ink-soft">{tenant?.name ?? "No tenant"}</span>
+                      </span>
+                    </Link>
+                    <SelectPill name="status" autoSubmit defaultValue={inc.status} ariaLabel={`Status of room ${inc.room.number}`}
+                      className="w-36 shrink-0" tone={TONE_CLASS[STATUS_TONE[inc.status]]}
+                      options={STATUS_OPTIONS.map((st) => ({ value: st, label: STATUS_LABEL[st] }))} />
+                    <div className="flex w-full items-center justify-end gap-2 pl-[52px] sm:w-auto sm:pl-0">
                       {inc.status === "TUNDA_BAYAR" && (
-                        <WaButton phone={tenant?.phone} label="Remind"
+                        <WaButton iconOnly phone={tenant?.phone} label={`Remind ${tenant?.name ?? "tenant"} on WhatsApp`}
                           text={reminderText(tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, year, month)} />
                       )}
-                      <label className="flex items-center rounded-full border border-line bg-cream px-3 py-1.5 focus-within:border-ink">
+                      <label className="flex min-h-11 flex-1 items-center rounded-full bg-cream-2 px-4 focus-within:ring-2 focus-within:ring-ink sm:flex-none">
                         <span className="mr-1 text-xs text-ink-soft">Rp</span>
                         <AutoSubmitAmount name="amount" defaultValue={inc.amount} aria-label={`Amount for room ${inc.room.number}`}
-                          className="num w-24 bg-transparent text-right text-sm outline-none" />
+                          className="num w-full min-w-0 bg-transparent text-right text-sm outline-none sm:w-24" />
                       </label>
                     </div>
                   </form>
@@ -117,68 +158,46 @@ export default async function CashPeriodPage({ params }: PageProps<"/kas/[period
           </div>
         </Section>
 
-        <div className="flex flex-col gap-4">
-          <Section title="Operating expenses">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Section title="Operating expenses" className={on("expenses")}
+            action={<QuickAddButton kind="expense" preset={{ periodId: period.id, periodLabel: label }} className="btn-primary btn-sm shrink-0 whitespace-nowrap">
+              <IconPlus width={16} height={16} /> Add expense
+            </QuickAddButton>}>
             {period.expenses.length === 0 ? <Empty>No expenses yet.</Empty> : (
               <ul className="divide-y divide-line">
-                {period.expenses.map((e) => (
-                  <li key={e.id} className="flex items-center gap-2 py-2">
-                    <span className="pill w-28 justify-center bg-cream">{CATEGORY_LABEL[e.category]}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm">{e.description}</span>
-                    <span className="num text-sm">{rupiah(e.amount)}</span>
-                    <form action={deleteExpense}>
-                      <input type="hidden" name="id" value={e.id} />
-                      <ConfirmButton message={`Delete expense "${e.description}"?`} aria-label="Delete"
-                        className="cursor-pointer rounded-full p-1.5 text-ink-soft hover:bg-blush hover:text-blush-deep">
-                        <IconTrash width={16} height={16} />
-                      </ConfirmButton>
-                    </form>
-                  </li>
-                ))}
+                {period.expenses.map((e) => {
+                  const meta = EXPENSE_META[e.category];
+                  const title = e.description && e.description !== "-" ? e.description : CATEGORY_LABEL[e.category];
+                  return (
+                    <li key={e.id}>
+                      <ListRow
+                        leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
+                        title={title}
+                        subtitle={title === CATEGORY_LABEL[e.category] ? undefined : CATEGORY_LABEL[e.category]}
+                        trailing={
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="num text-sm font-semibold">{rupiah(e.amount)}</span>
+                            <form action={deleteExpense}>
+                              <input type="hidden" name="id" value={e.id} />
+                              <ConfirmButton message={`Delete expense "${title}"?`} aria-label={`Delete expense ${title}`}
+                                className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
+                                <IconTrash width={18} height={18} />
+                              </ConfirmButton>
+                            </form>
+                          </div>
+                        } />
+                    </li>
+                  );
+                })}
               </ul>
             )}
-            <form action={addExpense} className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-cream p-3 sm:grid-cols-[auto_1fr_8rem_auto]">
-              <input type="hidden" name="periodId" value={period.id} />
-              <select name="category" aria-label="Category" className="field" defaultValue="LISTRIK">
-                {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
-              </select>
-              <input name="amount" inputMode="numeric" required placeholder="Amount" aria-label="Amount" className="field num sm:order-3" />
-              <input name="description" placeholder="Description" aria-label="Description" className="field col-span-2 sm:order-2 sm:col-span-1" />
-              <SubmitButton className="btn-primary col-span-2 sm:order-4 sm:col-span-1" pendingText="…"><IconPlus width={16} height={16} /> Add</SubmitButton>
-            </form>
+            <div className="mt-3 flex justify-between rounded-2xl bg-cream px-4 py-3 text-sm font-semibold">
+              <span>Total expenses</span>
+              <span className="num">{rupiah(s.expenseTotal)}</span>
+            </div>
           </Section>
 
-          <Section title="Other income">
-            {period.additionalIncomes.length === 0 ? <Empty>No other income yet.</Empty> : (
-              <ul className="divide-y divide-line">
-                {period.additionalIncomes.map((a) => (
-                  <li key={a.id} className="flex items-center gap-2 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{a.description}</div>
-                      {a.source && <div className="text-xs text-ink-soft">{a.source}</div>}
-                    </div>
-                    <span className="num text-sm">{rupiah(a.amount)}</span>
-                    <form action={deleteAdditionalIncome}>
-                      <input type="hidden" name="id" value={a.id} />
-                      <ConfirmButton message={`Delete "${a.description}"?`} aria-label="Delete"
-                        className="cursor-pointer rounded-full p-1.5 text-ink-soft hover:bg-blush hover:text-blush-deep">
-                        <IconTrash width={16} height={16} />
-                      </ConfirmButton>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <form action={addAdditionalIncome} className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-cream p-3 sm:grid-cols-[1fr_1fr_8rem_auto]">
-              <input type="hidden" name="periodId" value={period.id} />
-              <input name="description" required placeholder="Description" aria-label="Description" className="field col-span-2 sm:col-span-1" />
-              <input name="source" placeholder="Source" aria-label="Source" className="field" />
-              <input name="amount" inputMode="numeric" required placeholder="Amount" aria-label="Amount" className="field num" />
-              <SubmitButton className="btn-primary col-span-2 sm:col-span-1" pendingText="…"><IconPlus width={16} height={16} /> Add</SubmitButton>
-            </form>
-          </Section>
-
-          <section className="card bg-ink text-cream">
+          <section className={`card bg-ink text-cream ${on("summary")}`}>
             <h2 className="h-display mb-3 text-lg">Cash flow summary</h2>
             <dl className="space-y-1.5 text-sm">
               {[
@@ -201,30 +220,66 @@ export default async function CashPeriodPage({ params }: PageProps<"/kas/[period
             </dl>
           </section>
 
-          <Section title="Transfer checklist"
-            action={<span className="pill bg-cream">{transfers.filter((t) => t.isSent).length}/{transfers.length}</span>}>
+          <Section title="Other income" className={on("summary")}>
+            {period.additionalIncomes.length === 0 ? <Empty>No other income yet.</Empty> : (
+              <ul className="divide-y divide-line">
+                {period.additionalIncomes.map((a) => (
+                  <li key={a.id} className="flex min-h-14 items-center gap-2 py-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{a.description}</div>
+                      {a.source && <div className="text-xs text-ink-soft">{a.source}</div>}
+                    </div>
+                    <span className="num text-sm">{rupiah(a.amount)}</span>
+                    <form action={deleteAdditionalIncome}>
+                      <input type="hidden" name="id" value={a.id} />
+                      <ConfirmButton message={`Delete "${a.description}"?`} aria-label={`Delete ${a.description}`}
+                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
+                        <IconTrash width={18} height={18} />
+                      </ConfirmButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form action={addAdditionalIncome} className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-cream p-3 sm:grid-cols-[1fr_1fr_8rem_auto]">
+              <input type="hidden" name="periodId" value={period.id} />
+              <input name="description" required placeholder="Description" aria-label="Description" className="field col-span-2 sm:col-span-1" />
+              <input name="source" placeholder="Source" aria-label="Source" className="field" />
+              <input name="amount" inputMode="numeric" required placeholder="Amount" aria-label="Amount" className="field num" />
+              <SubmitButton className="btn-primary col-span-2 sm:col-span-1" pendingText="…"><IconPlus width={16} height={16} /> Add</SubmitButton>
+            </form>
+          </Section>
+
+          <Section title="Transfer checklist" className={on("transfers")}
+            action={<CountPill n={transfers.filter((t) => !t.isSent).length} />}>
             {transfers.length === 0 ? (
               <Empty>No recipients yet. Add them in <Link href="/pengaturan" className="underline">Settings</Link>.</Empty>
             ) : (
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 {transfers.map((t) => (
-                  <li key={t.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl pr-2 ${t.isSent ? "bg-mint text-mint-deep" : "bg-cream"}`}>
-                    <form action={toggleTransfer} className="min-w-0 flex-1">
-                      <input type="hidden" name="id" value={t.id} />
-                      <button className={`flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm ${t.isSent ? "" : "hover:bg-cream-2"}`}>
-                        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 ${t.isSent ? "border-mint-deep bg-mint-deep text-mint" : "border-ink/30"}`}>
-                          {t.isSent && <IconCheck width={12} height={12} strokeWidth={3} />}
-                        </span>
-                        <span className="flex-1 font-medium">
+                  <li key={t.id} className={`rounded-3xl py-1 pr-3 pl-1 ${t.isSent ? "bg-mint" : "bg-cream"}`}>
+                    <div className="flex items-center gap-2">
+                      <form action={toggleTransfer}>
+                        <input type="hidden" name="id" value={t.id} />
+                        <SwitchSubmit checked={t.isSent} label={`Transfer to ${t.recipient.name} sent`} />
+                      </form>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">
                           Transfer to {t.recipient.name}
-                          {t.recipient.role && <span className="ml-1.5 text-xs opacity-70">· {t.recipient.role}</span>}
-                        </span>
-                        {t.sentAt && <span className="num text-xs">{t.sentAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}</span>}
-                      </button>
-                    </form>
-                    <span className="pl-11 sm:pl-0">
-                      <BankAccount bank={t.recipient.bankName} account={t.recipient.accountNumber} holder={t.recipient.accountHolder} />
-                    </span>
+                          {t.recipient.role && <span className="ml-1.5 text-xs font-normal text-ink-soft">· {t.recipient.role}</span>}
+                        </div>
+                        <div className="text-xs text-ink-soft">
+                          {t.isSent && t.sentAt
+                            ? `Sent ${t.sentAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}`
+                            : "Not sent yet"}
+                        </div>
+                      </div>
+                    </div>
+                    {(t.recipient.accountNumber || t.recipient.bankName) && (
+                      <div className="pb-1 pl-[52px]">
+                        <BankAccount bank={t.recipient.bankName} account={t.recipient.accountNumber} holder={t.recipient.accountHolder} />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

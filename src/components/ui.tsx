@@ -7,7 +7,7 @@ export function StatusPill({ status }: { status: RoomStatus }) {
   return <span className={`pill ${TONE_CLASS[STATUS_TONE[status]]}`}>{STATUS_LABEL[status]}</span>;
 }
 
-export function PageHeader({ title, subtitle, actions, titleClassName = "font-greeting text-5xl leading-tight font-normal tracking-tight md:text-6xl", actionsClassName = "" }: {
+export function PageHeader({ title, subtitle, actions, titleClassName = "font-greeting text-4xl leading-tight font-extrabold tracking-tight md:text-6xl", actionsClassName = "" }: {
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
@@ -59,7 +59,7 @@ export function Section({ title, action, children, className = "" }: {
   return (
     <section className={`card bg-white ${className}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="h-display text-lg">{title}</h2>
+        <h2 className="h-display min-w-0 text-lg">{title}</h2>
         {action}
       </div>
       {children}
@@ -67,9 +67,17 @@ export function Section({ title, action, children, className = "" }: {
   );
 }
 
-export function WaButton({ phone, text, label = "WhatsApp" }: { phone: string | null | undefined; text?: string; label?: string }) {
+export function WaButton({ phone, text, label = "WhatsApp", iconOnly = false }: { phone: string | null | undefined; text?: string; label?: string; iconOnly?: boolean }) {
   const href = waLink(phone, text);
   if (!href) return null;
+  if (iconOnly) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-mint text-mint-deep hover:bg-mint/70">
+        <IconWhatsApp width={20} height={20} />
+      </a>
+    );
+  }
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
       className="btn btn-sm bg-mint text-mint-deep hover:bg-mint/70">
@@ -81,22 +89,6 @@ export function WaButton({ phone, text, label = "WhatsApp" }: { phone: string | 
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-2xl bg-cream px-4 py-6 text-center text-sm text-ink-soft">{children}</p>;
-}
-
-export function Donut({ value, total, size = 56 }: { value: number; total: number; size?: number }) {
-  const r = (size - 8) / 2;
-  const c = 2 * Math.PI * r;
-  const frac = total ? value / total : 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${value} of ${total}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeOpacity={0.18} strokeWidth={7} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={7} strokeLinecap="round"
-        strokeDasharray={`${c * frac} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" className="num" fontSize={13} fontWeight={600} fill="currentColor">
-        {Math.round(frac * 100)}%
-      </text>
-    </svg>
-  );
 }
 
 export function Sparkline({ values, width = 96, height = 40 }: { values: number[]; width?: number; height?: number }) {

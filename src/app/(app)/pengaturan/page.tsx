@@ -3,6 +3,7 @@ import { addRecipient, toggleRecipient, updateRecipientBank } from "@/app/action
 import { PageHeader, Section } from "@/components/ui";
 import { SubmitButton } from "@/components/forms";
 import { BankAccount } from "@/components/bank";
+import { SwitchSubmit } from "@/components/kit-client";
 import { IconPlus } from "@/components/icons";
 
 export default async function SettingsPage() {
@@ -18,23 +19,21 @@ export default async function SettingsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className={`text-sm font-semibold ${r.isActive ? "" : "text-ink-soft line-through"}`}>{r.name}</div>
-                    {r.role && <div className="text-xs text-ink-soft">{r.role}</div>}
+                    <div className="text-xs text-ink-soft">{[r.role, r.isActive ? "Active" : "Inactive"].filter(Boolean).join(" · ")}</div>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
                     <BankAccount bank={r.bankName} account={r.accountNumber} holder={r.accountHolder} />
                     <form action={toggleRecipient}>
                       <input type="hidden" name="id" value={r.id} />
-                      <SubmitButton className={`btn btn-sm ${r.isActive ? "bg-mint text-mint-deep" : "bg-cream text-ink-soft"}`}>
-                        {r.isActive ? "Active" : "Inactive"}
-                      </SubmitButton>
+                      <SwitchSubmit checked={r.isActive} label={`${r.name} active`} />
                     </form>
                   </div>
                 </div>
                 <details className="mt-1.5">
-                  <summary className="cursor-pointer text-xs font-semibold text-ink-soft hover:text-ink">
+                  <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-semibold text-ink-soft hover:text-ink">
                     {r.accountNumber ? "Edit bank account" : "Add bank account"}
                   </summary>
-                  <form action={updateRecipientBank} className="mt-2 grid grid-cols-[6rem_1fr] gap-2 sm:grid-cols-[6rem_1fr_1fr_auto]">
+                  <form action={updateRecipientBank} className="mt-2 grid grid-cols-[6rem_minmax(0,1fr)] gap-2 sm:grid-cols-[6rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <input type="hidden" name="id" value={r.id} />
                     <input name="bankName" defaultValue={r.bankName ?? ""} placeholder="BSI" aria-label={`Bank for ${r.name}`} className="field" />
                     <input name="accountNumber" defaultValue={r.accountNumber ?? ""} inputMode="numeric" placeholder="Account number"

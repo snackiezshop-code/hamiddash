@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions";
 import { IconDoor, IconHome, IconList, IconLogout, IconSettings, IconUser, IconWallet } from "./icons";
 import { Logo } from "./logo";
+import { Plus } from "@phosphor-icons/react";
+import { useQuickAdd } from "./quick-add";
 import { MiniCalendar, type ReminderEntry } from "./mini-calendar";
 
 const MAIN_ITEMS = [
@@ -34,7 +36,7 @@ export function Sidebar({ reminders }: { reminders: ReminderEntry[] }) {
         <span className="grid h-9 w-9 place-items-center rounded-full bg-white p-1.5">
           <Logo className="h-full w-full" />
         </span>
-        <span className="font-greeting text-2xl leading-none">Hamid</span>
+        <span className="font-greeting text-2xl leading-none font-extrabold tracking-tight">Hamid</span>
       </Link>
       <nav className="flex flex-col gap-1">
         {MAIN_ITEMS.map(({ href, label, icon: Icon }) => (
@@ -73,21 +75,30 @@ export function Sidebar({ reminders }: { reminders: ReminderEntry[] }) {
 
 export function BottomBar() {
   const pathname = usePathname();
+  const { open } = useQuickAdd();
+  const tab = ({ href, label, icon: Icon }: (typeof ITEMS)[number]) => {
+    const active = isActive(pathname, href);
+    return (
+      <Link key={href} href={href} aria-current={active ? "page" : undefined}
+        className={`flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 text-[11px] font-semibold ${
+          active ? "bg-cream text-ink" : "text-cream/75"
+        }`}>
+        <Icon width={22} height={22} />
+        <span className="max-w-full truncate">{label.split(" ")[0]}</span>
+      </Link>
+    );
+  };
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-40 flex justify-around rounded-full bg-ink px-2 py-2 text-cream shadow-lg md:hidden"
-      style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
-      {ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link key={href} href={href} aria-label={label}
-            className={`flex flex-col items-center gap-0.5 rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-              active ? "bg-cream text-ink" : "text-cream/70"
-            }`}>
-            <Icon width={22} height={22} />
-            {label.split(" ")[0]}
-          </Link>
-        );
-      })}
+    <nav aria-label="Main" className="fixed inset-x-3 bottom-3 z-40 flex items-center rounded-[28px] bg-ink p-1.5 text-cream md:hidden"
+      style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="flex flex-1 gap-0.5">{ITEMS.slice(0, 3).map(tab)}</div>
+      <div className="relative w-[72px] shrink-0 self-stretch">
+        <button type="button" onClick={() => open("menu")} aria-label="Quick add" aria-haspopup="dialog"
+          className="absolute -top-8 left-1/2 grid h-16 w-16 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-fab text-ink transition-transform active:scale-95">
+          <Plus size={28} weight="bold" aria-hidden />
+        </button>
+      </div>
+      <div className="flex flex-1 gap-0.5">{ITEMS.slice(3).map(tab)}</div>
     </nav>
   );
 }

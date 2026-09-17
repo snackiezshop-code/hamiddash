@@ -5,6 +5,7 @@ import { STATUS_LABEL, STATUS_OPTIONS, dateInputValue, periodLabel, periodSlug, 
 import { updateRoom } from "@/app/actions";
 import { PageHeader, Section, StatusPill, WaButton } from "@/components/ui";
 import { SubmitButton } from "@/components/forms";
+import { SelectPill } from "@/components/kit-client";
 import { IconChevronLeft } from "@/components/icons";
 
 export default async function RoomDetailPage({ params }: PageProps<"/kamar/[number]">) {
@@ -38,10 +39,9 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
             <h2 className="h-display mb-3 text-lg">Room</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="label" htmlFor="status">Status</label>
-                <select id="status" name="status" defaultValue={room.status} className="field">
-                  {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                </select>
+                <span className="label">Status</span>
+                <SelectPill name="status" ariaLabel="Status" defaultValue={room.status}
+                  options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABEL[s] }))} />
               </div>
               <div>
                 <label className="label" htmlFor="monthlyRent">Monthly rent (Rp)</label>
@@ -99,7 +99,7 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
                     {periodLabel(inc.period.year, inc.period.month)}
                   </Link>
                   <div className="flex items-center gap-2">
-                    <span className="num text-sm">{inc.amount ? rupiah(inc.amount) : "—"}</span>
+                    <span className="num text-sm">{rupiah(inc.amount)}</span>
                     <StatusPill status={inc.status} />
                   </div>
                 </li>

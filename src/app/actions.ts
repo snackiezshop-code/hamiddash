@@ -79,6 +79,41 @@ export async function updateRoom(form: FormData) {
   redirect("/kamar");
 }
 
+// Returns an error message for the sheet to show, or undefined on success.
+export async function addTenant(form: FormData) {
+  await requireAdmin();
+  const roomId = str(form, "roomId");
+  const name = str(form, "tenantName");
+  if (!name) return "Enter the tenant's name.";
+  const room = await db.room.findUnique({ where: { id: roomId }, include: { tenant: true } });
+  if (!room) return "That room no longer exists.";
+  if (room.tenant) return `Room ${room.number} already has a tenant (${room.tenant.name}).`;
+
+  await db.tenant.create({
+    data: {
+      roomId,
+      name,
+      phone: optStr(form, "phone"),
+      reminderDay: optReminderDay(form, "reminderDay"),
+      moveInDate: optDate(form, "moveInDate"),
+    },
+  });
+  if (room.status === "KOSONG") {
+    await db.room.update({ where: { id: roomId }, data: { status: "TUNDA_BAYAR" } });
+    await syncLatestIncome(roomId, "TUNDA_BAYAR", room.monthlyRent);
+  }
+  refresh();
+}
+
+export async function checkoutTenant(form: FormData) {
+  await requireAdmin();
+  const room = await db.room.findUniqueOrThrow({ where: { id: str(form, "roomId") } });
+  await db.tenant.deleteMany({ where: { roomId: room.id } });
+  await db.room.update({ where: { id: room.id }, data: { status: "KOSONG" } });
+  await syncLatestIncome(room.id, "KOSONG", room.monthlyRent);
+  refresh();
+}
+
 async function syncLatestIncome(roomId: string, status: RoomStatus, rent: number) {
   const latest = await db.cashPeriod.findFirst({ orderBy: [{ year: "desc" }, { month: "desc" }] });
   if (!latest) return;
