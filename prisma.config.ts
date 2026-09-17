@@ -10,7 +10,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   engine: "classic",
+  // CLI (migrations) must use Neon's direct connection; the pooled one can time out on migration locks.
   datasource: {
-    url: env("DATABASE_URL"),
+    url: env("DATABASE_URL_UNPOOLED"),
   },
 });
