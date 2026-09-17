@@ -42,7 +42,7 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
   };
 
   return (
-    <div ref={ref} className="relative mt-3 w-full max-w-md">
+    <div ref={ref} className="relative w-full max-w-md">
       <label className="flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 focus-within:border-ink">
         <IconSearch width={18} height={18} className="shrink-0 text-ink-soft" />
         <input

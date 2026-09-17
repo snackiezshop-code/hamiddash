@@ -94,11 +94,18 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title="Hello, Max."
-        subtitle={<RoomSearch rooms={rooms.map((r) => ({
-          number: r.number, status: r.status, tenant: r.tenant?.name ?? null, phone: r.tenant?.phone ?? null,
-        }))} />}
+        subtitle={
+          <div className="mt-3 flex items-center gap-2">
+            <RoomSearch rooms={rooms.map((r) => ({
+              number: r.number, status: r.status, tenant: r.tenant?.name ?? null, phone: r.tenant?.phone ?? null,
+            }))} />
+            <div className="md:hidden">
+              <NotificationBell notifications={notifications} />
+            </div>
+          </div>
+        }
         actions={<NotificationBell notifications={notifications} />}
-        actionsClassName="order-first ml-auto self-start sm:order-none sm:mt-1"
+        actionsClassName="hidden self-start md:mt-1 md:flex"
       />
 
       {needsNewPeriod && (
