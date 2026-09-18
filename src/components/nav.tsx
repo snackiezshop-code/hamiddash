@@ -91,10 +91,10 @@ export function BottomBar() {
     <nav aria-label="Main" className="fixed bottom-3 left-1/2 z-40 flex w-[calc(100%-3rem)] max-w-[20rem] -translate-x-1/2 items-center rounded-[28px] bg-ink p-1.5 text-cream md:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
       <div className="flex flex-1 gap-0.5">{MAIN_ITEMS.slice(0, 2).map(tab)}</div>
-      <div className="relative w-16 shrink-0 self-stretch">
+      <div className="relative w-14 shrink-0 self-stretch">
         <button type="button" onClick={() => open("menu")} aria-label="Quick add" aria-haspopup="dialog"
-          className="absolute -top-8 left-1/2 grid h-16 w-16 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-fab text-ink transition-transform active:scale-95">
-          <Plus size={28} weight="bold" aria-hidden />
+          className="absolute -top-[34px] left-1/2 grid h-14 w-14 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-fab text-ink transition-transform active:scale-95">
+          <Plus size={24} weight="bold" aria-hidden />
         </button>
       </div>
       <div className="flex flex-1 gap-0.5">{MAIN_ITEMS.slice(2).map(tab)}</div>
