@@ -13,7 +13,7 @@ export default function LoginPage() {
           <span className="grid h-11 w-11 place-items-center rounded-full bg-white p-2">
             <Logo className="h-full w-full" />
           </span>
-          <h1 className="h-display mt-6 text-3xl">Hamid</h1>
+          <h1 className="font-greeting mt-6 text-4xl">Hamid</h1>
           <p className="mt-1 text-sm text-cream/60">Kost Mujair 12</p>
         </div>
         <form action={action} className="card bg-white">

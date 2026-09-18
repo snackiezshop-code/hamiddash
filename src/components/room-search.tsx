@@ -43,12 +43,12 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
 
   return (
     <div ref={ref} className="relative w-full max-w-md">
-      <label className="flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 focus-within:border-ink">
+      <label className="flex items-center gap-2 h-11 rounded-full border border-line bg-white px-4 focus-within:border-ink">
         <IconSearch width={18} height={18} className="shrink-0 text-ink-soft" />
         <input
           type="search"
           value={query}
-          placeholder="Search room, tenant or phone"
+          placeholder="Room or tenant"
           aria-label="Search rooms and tenants"
           role="combobox"
           aria-expanded={open && query.trim() !== ""}

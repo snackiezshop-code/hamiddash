@@ -27,7 +27,7 @@
   --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
-  --font-greeting: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-greeting: var(--font-dm-serif), ui-serif, Georgia, serif;
 
   /* Type scale: 13 / 16 / 17 / 20 / 24 / 28 / 32 / 40 — body text never below 16px */
   --text-xs: 0.8125rem;

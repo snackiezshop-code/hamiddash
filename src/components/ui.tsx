@@ -7,7 +7,7 @@ export function StatusPill({ status }: { status: RoomStatus }) {
   return <span className={`pill ${TONE_CLASS[STATUS_TONE[status]]}`}>{STATUS_LABEL[status]}</span>;
 }
 
-export function PageHeader({ title, subtitle, actions, titleClassName = "font-greeting text-4xl leading-tight font-extrabold tracking-tight md:text-6xl", actionsClassName = "" }: {
+export function PageHeader({ title, subtitle, actions, titleClassName = "font-greeting text-4xl leading-tight font-normal md:text-6xl", actionsClassName = "" }: {
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;

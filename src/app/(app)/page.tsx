@@ -10,7 +10,7 @@ import { AlertCallout, Avatar, Chevron, CountPill, IconBadge, ListRow, OCCUPANCY
 import { SubmitButton } from "@/components/forms";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
 import { RoomSearch } from "@/components/room-search";
-import { IconCalendar, IconCheck, IconWallet } from "@/components/icons";
+import { IconCalendar, IconCheck, IconSettings, IconWallet } from "@/components/icons";
 
 export default async function DashboardPage() {
   const now = todayJakarta();
@@ -100,8 +100,12 @@ export default async function DashboardPage() {
             <RoomSearch rooms={rooms.map((r) => ({
               number: r.number, status: r.status, tenant: r.tenant?.name ?? null, phone: r.tenant?.phone ?? null,
             }))} />
-            <div className="md:hidden">
+            <div className="flex shrink-0 items-center gap-2 md:hidden">
               <NotificationBell notifications={notifications} />
+              <Link href="/pengaturan" aria-label="Settings"
+                className="grid h-11 w-11 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:bg-cream-2">
+                <IconSettings width={20} height={20} />
+              </Link>
             </div>
           </div>
         }

@@ -47,9 +47,9 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
         aria-label={count ? `Notifications (${count})` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-ink/20 bg-white transition-colors hover:bg-cream-2"
+        className="relative grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-white transition-colors hover:bg-cream-2"
       >
-        <IconBell width={18} height={18} />
+        <IconBell width={20} height={20} />
         {count > 0 && (
           <span className="num absolute -top-1.5 -right-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-blush-deep px-1 text-[10px] font-semibold text-white">
             {count > 9 ? "9+" : count}

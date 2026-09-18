@@ -16,7 +16,6 @@ const MAIN_ITEMS = [
   { href: "/checklist", label: "Checklist", icon: IconList },
 ];
 const SETTINGS_ITEM = { href: "/pengaturan", label: "Settings", icon: IconSettings };
-const ITEMS = [...MAIN_ITEMS, SETTINGS_ITEM];
 
 function navLinkClass(active: boolean) {
   return `flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
@@ -36,7 +35,7 @@ export function Sidebar({ reminders }: { reminders: ReminderEntry[] }) {
         <span className="grid h-9 w-9 place-items-center rounded-full bg-white p-1.5">
           <Logo className="h-full w-full" />
         </span>
-        <span className="font-greeting text-2xl leading-none font-extrabold tracking-tight">Hamid</span>
+        <span className="font-greeting text-2xl leading-none font-normal">Hamid</span>
       </Link>
       <nav className="flex flex-col gap-1">
         {MAIN_ITEMS.map(({ href, label, icon: Icon }) => (
@@ -76,7 +75,7 @@ export function Sidebar({ reminders }: { reminders: ReminderEntry[] }) {
 export function BottomBar() {
   const pathname = usePathname();
   const { open } = useQuickAdd();
-  const tab = ({ href, label, icon: Icon }: (typeof ITEMS)[number]) => {
+  const tab = ({ href, label, icon: Icon }: (typeof MAIN_ITEMS)[number]) => {
     const active = isActive(pathname, href);
     return (
       <Link key={href} href={href} aria-current={active ? "page" : undefined}
@@ -91,14 +90,14 @@ export function BottomBar() {
   return (
     <nav aria-label="Main" className="fixed inset-x-3 bottom-3 z-40 flex items-center rounded-[28px] bg-ink p-1.5 text-cream md:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="flex flex-1 gap-0.5">{ITEMS.slice(0, 3).map(tab)}</div>
+      <div className="flex flex-1 gap-0.5">{MAIN_ITEMS.slice(0, 2).map(tab)}</div>
       <div className="relative w-[72px] shrink-0 self-stretch">
         <button type="button" onClick={() => open("menu")} aria-label="Quick add" aria-haspopup="dialog"
           className="absolute -top-8 left-1/2 grid h-16 w-16 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-fab text-ink transition-transform active:scale-95">
           <Plus size={28} weight="bold" aria-hidden />
         </button>
       </div>
-      <div className="flex flex-1 gap-0.5">{ITEMS.slice(3).map(tab)}</div>
+      <div className="flex flex-1 gap-0.5">{MAIN_ITEMS.slice(2).map(tab)}</div>
     </nav>
   );
 }
