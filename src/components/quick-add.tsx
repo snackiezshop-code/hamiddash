@@ -6,6 +6,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { addChecklistItem, addExpense, addTenant, updateRoomIncome } from "@/app/actions";
 import { CATEGORY_LABEL, CATEGORY_OPTIONS, rupiah } from "@/lib/format";
 import { DuePills, Field, FormSheet, SelectPill, Sheet } from "./kit-client";
+import { AmountInput } from "./forms";
 
 export type QuickAddData = {
   period: { id: string; label: string } | null;
@@ -138,14 +139,14 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
             <p className="-mt-2 text-center text-xs text-ink-soft">Goes into the {expensePeriodLabel} cash book</p>
             <div>
               <span className="label">Category</span>
-              <SelectPill name="category" ariaLabel="Category"
+              <SelectPill name="category" ariaLabel="Category" required requiredMessage="Choose a category"
                 options={CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] }))} />
             </div>
             <Field label="Description" htmlFor="qa-exp-desc">
               <input id="qa-exp-desc" name="description" placeholder="e.g. Pipe repair, Room 4" className="field" />
             </Field>
             <Field label="Amount (Rp)" htmlFor="qa-exp-amount">
-              <input id="qa-exp-amount" name="amount" required inputMode="numeric" pattern="[0-9.,\s]*[1-9][0-9.,\s]*" placeholder="350000" className="field num" />
+              <AmountInput id="qa-exp-amount" name="amount" required pattern="[0-9.,\s]*[1-9][0-9.,\s]*" title="Enter an amount above 0" placeholder="350.000" className="field num" />
             </Field>
           </>
         )}
@@ -184,7 +185,7 @@ function PaymentFields({ unpaid }: { unpaid: QuickAddData["unpaid"] }) {
           options={unpaid.map((u) => ({ value: u.incomeId, label: `Room ${u.roomNumber} · ${u.tenant ?? "No tenant"}`, hint: rupiah(u.rent) }))} />
       </div>
       <Field label="Amount received (Rp)" htmlFor="qa-pay-amount">
-        <input key={current.incomeId} id="qa-pay-amount" name="amount" required inputMode="numeric"
+        <AmountInput key={current.incomeId} id="qa-pay-amount" name="amount" required
           defaultValue={current.rent} className="field num" />
       </Field>
       <p className="-mt-2 text-xs text-ink-soft">The room is marked Paid for this month.</p>

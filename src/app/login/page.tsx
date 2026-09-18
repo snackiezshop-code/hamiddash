@@ -7,7 +7,7 @@ import { Logo } from "@/components/logo";
 export default function LoginPage() {
   const [error, action, pending] = useActionState(login, null);
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <main className="safe-gutter grid min-h-screen place-items-center pb-4">
       <div className="w-full max-w-sm">
         <div className="card mb-3 bg-ink text-cream">
           <span className="grid h-11 w-11 place-items-center rounded-full bg-white p-2">

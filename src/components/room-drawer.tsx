@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { createContext, useContext, useState, type ComponentProps, type ReactNode } from "react";
 import { DoorOpen, PencilSimple } from "@phosphor-icons/react";
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { checkoutTenant } from "@/app/actions";
@@ -28,28 +28,69 @@ export type DrawerRoom = {
   history: { id: string; year: number; month: number; status: RoomStatus; amount: number }[];
 };
 
-export function RoomsMobileList({ rooms }: { rooms: DrawerRoom[] }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const room = rooms.find((r) => r.id === openId) ?? null;
+// Phones open a room as this drawer wherever it's tapped (Rooms list, Overview tiles, search);
+// from md up the same taps go to the full /kamar/[number] page.
+const DrawerCtx = createContext<((roomNumber: number) => boolean) | null>(null);
 
+const isPhone = () => window.matchMedia("(width < 48rem)").matches;
+
+export function RoomDrawerProvider({ rooms, children }: { rooms: DrawerRoom[]; children: ReactNode }) {
+  const [openNumber, setOpenNumber] = useState<number | null>(null);
+  const room = rooms.find((r) => r.number === openNumber) ?? null;
+  // Returns false when the caller should fall back to navigating (desktop, or a room it doesn't know).
+  const openRoom = (n: number) => {
+    if (!isPhone() || !rooms.some((r) => r.number === n)) return false;
+    setOpenNumber(n);
+    return true;
+  };
   return (
-    <>
-      <ul className="divide-y divide-line px-4 md:hidden">
-        {rooms.map((r) => (
-          <li key={r.id}>
-            <button type="button" onClick={() => setOpenId(r.id)} className="block w-full cursor-pointer text-left"
-              aria-label={`Room ${r.number}${r.tenant ? `, ${r.tenant.name}` : ", no tenant"}, ${STATUS_LABEL[r.status]}. Open details`}>
-              <ListRow
-                leading={r.tenant ? <Avatar name={r.tenant.name} tone={STATUS_PASTEL[r.status]} /> : <IconBadge icon={DoorOpen} tone={STATUS_PASTEL[r.status]} />}
-                title={`Room ${r.number} · ${r.tenant?.name ?? "No tenant"}`}
-                subtitle={<><span className="num">{rupiah(r.monthlyRent)}</span> · {STATUS_LABEL[r.status]}</>}
-                trailing={<Chevron />} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      <RoomDrawer room={room} onClose={() => setOpenId(null)} />
-    </>
+    <DrawerCtx.Provider value={openRoom}>
+      {children}
+      <RoomDrawer room={room} onClose={() => setOpenNumber(null)} />
+    </DrawerCtx.Provider>
+  );
+}
+
+export function useRoomDrawer() {
+  return useContext(DrawerCtx) ?? (() => false);
+}
+
+// A link to /kamar/[number] that opens the drawer instead on phones.
+export function RoomLink({ roomNumber, onClick, ...rest }: Omit<ComponentProps<typeof Link>, "href"> & { roomNumber: number }) {
+  const openRoom = useRoomDrawer();
+  return (
+    <Link {...rest} href={`/kamar/${roomNumber}`} onClick={(e) => {
+      onClick?.(e);
+      if (!e.defaultPrevented && !e.metaKey && !e.ctrlKey && openRoom(roomNumber)) e.preventDefault();
+    }} />
+  );
+}
+
+export function RoomsMobileList({ rooms }: { rooms: DrawerRoom[] }) {
+  return (
+    <RoomDrawerProvider rooms={rooms}>
+      <RoomsMobileRows rooms={rooms} />
+    </RoomDrawerProvider>
+  );
+}
+
+function RoomsMobileRows({ rooms }: { rooms: DrawerRoom[] }) {
+  const openRoom = useRoomDrawer();
+  return (
+    <ul className="divide-y divide-line px-4 md:hidden">
+      {rooms.map((r) => (
+        <li key={r.id}>
+          <button type="button" onClick={() => openRoom(r.number)} className="block w-full cursor-pointer text-left"
+            aria-label={`Room ${r.number}${r.tenant ? `, ${r.tenant.name}` : ", no tenant"}, ${STATUS_LABEL[r.status]}. Open details`}>
+            <ListRow
+              leading={r.tenant ? <Avatar name={r.tenant.name} tone={STATUS_PASTEL[r.status]} /> : <IconBadge icon={DoorOpen} tone={STATUS_PASTEL[r.status]} />}
+              title={`Room ${r.number} · ${r.tenant?.name ?? "No tenant"}`}
+              subtitle={<><span className="num">{rupiah(r.monthlyRent)}</span> · {STATUS_LABEL[r.status]}</>}
+              trailing={<Chevron />} />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -109,7 +150,7 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
                 <span className="pill num min-h-11 bg-white px-4">{rupiah(room.monthlyRent)} / month</span>
               </div>
 
-              {t.notes && <p className="rounded-3xl bg-white px-4 py-3 text-sm whitespace-pre-line">{t.notes}</p>}
+              {t.notes && <p className="rounded-3xl bg-white px-4 py-3 text-sm break-words whitespace-pre-line">{t.notes}</p>}
             </>
           ) : (
             <button type="button" className="btn-primary" onClick={() => { onClose(); open("tenant", { roomId: room.id }); }}>

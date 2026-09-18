@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { SESSION_COOKIE, SESSION_DAYS, createToken, timingSafeEqual } from "@/lib/session";
 import { createPeriod, isLatestPeriod, recarryBalances } from "@/lib/cashbook";
-import { CATEGORY_OPTIONS, STATUS_OPTIONS, parseAmount, periodSlug } from "@/lib/format";
+import { CATEGORY_OPTIONS, STATUS_OPTIONS, isFuturePeriod, parseAmount, periodSlug } from "@/lib/format";
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -137,6 +137,8 @@ export async function startPeriod(form: FormData) {
   await requireAdmin();
   const year = Number(str(form, "year"));
   const month = Number(str(form, "month"));
+  // Cash books can't be started ahead of time: there's no undo for creating a period.
+  if (isFuturePeriod(year, month)) redirect("/kas");
   const existing = await db.cashPeriod.findUnique({ where: { year_month: { year, month } } });
   if (!existing) {
     await createPeriod(year, month);
@@ -199,7 +201,7 @@ export async function addExpense(form: FormData) {
   await requireAdmin();
   const period = await periodOf(str(form, "periodId"));
   const category = str(form, "category") as ExpenseCategory;
-  if (!CATEGORY_OPTIONS.includes(category)) throw new Error("Invalid category");
+  if (!CATEGORY_OPTIONS.includes(category)) return "Choose a category.";
   const amount = parseAmount(form.get("amount"));
   if (amount <= 0) return;
   await db.expense.create({

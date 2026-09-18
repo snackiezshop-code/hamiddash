@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   Broom, CaretRight, ClipboardText, DoorOpen, DotsThreeOutline, Drop, HandCoins, Lightning,
@@ -49,17 +48,19 @@ export const STATUS_PASTEL: Record<RoomStatus, Pastel> = {
 };
 
 // Leading badge → label (+ secondary line) → one trailing element (brief 6.2).
-export function ListRow({ leading, title, subtitle, trailing }: {
+// wrapTitle: for rows whose title is the whole content (tasks), so nothing is cut off with no way to read it.
+export function ListRow({ leading, title, subtitle, trailing, wrapTitle = false }: {
   leading: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
   trailing?: ReactNode;
+  wrapTitle?: boolean;
 }) {
   return (
     <div className="flex min-h-14 items-center gap-3 py-2">
       {leading}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{title}</div>
+        <div className={`text-sm font-semibold ${wrapTitle ? "break-words" : "truncate"}`}>{title}</div>
         {subtitle && <div className="truncate text-xs text-ink-soft">{subtitle}</div>}
       </div>
       {trailing}
@@ -73,26 +74,6 @@ export function CountPill({ n }: { n: number }) {
 
 export function Chevron() {
   return <CaretRight size={18} weight="bold" className="shrink-0 text-ink-soft" aria-hidden />;
-}
-
-// Solid ink pill for the selected tab, plain text for the rest (brief 6.4).
-export function SegmentedLinks({ label, items }: { label: string; items: { href: string; label: string; active: boolean }[] }) {
-  return (
-    <nav aria-label={label} className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <ul className="flex w-max sm:gap-1">
-        {items.map((it) => (
-          <li key={it.href}>
-            <Link href={it.href} scroll={false} aria-current={it.active ? "page" : undefined}
-              className={`inline-flex min-h-11 items-center rounded-full px-2.5 text-sm sm:px-4 font-semibold whitespace-nowrap transition-colors ${
-                it.active ? "bg-ink text-cream" : "text-ink-soft hover:text-ink"
-              }`}>
-              {it.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
 }
 
 type CategoryMeta = { tone: Pastel; icon: Icon };

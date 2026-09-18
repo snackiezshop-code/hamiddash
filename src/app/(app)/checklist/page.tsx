@@ -3,7 +3,8 @@ import { formatDate, todayJakarta } from "@/lib/format";
 import { deleteChecklistItem, toggleChecklistItem } from "@/app/actions";
 import { Empty, PageHeader, Section } from "@/components/ui";
 import { ConfirmButton, SubmitButton } from "@/components/forms";
-import { CountPill, IconBadge, ListRow, SegmentedLinks, TASK_CATEGORIES, taskCategoryMeta } from "@/components/kit";
+import { CountPill, IconBadge, ListRow, TASK_CATEGORIES, taskCategoryMeta } from "@/components/kit";
+import { SegmentedLinks } from "@/components/kit-client";
 import { QuickAddButton } from "@/components/quick-add";
 import { IconCheck, IconPlus, IconTrash } from "@/components/icons";
 
@@ -67,7 +68,7 @@ export default async function ChecklistPage({ searchParams }: PageProps<"/checkl
               const room = item.roomId ? roomNo.get(item.roomId) : undefined;
               return (
                 <li key={item.id}>
-                  <ListRow
+                  <ListRow wrapTitle
                     leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
                     title={<span className={item.isDone ? "text-ink-soft line-through" : ""}>{item.title}</span>}
                     subtitle={[item.category, room !== undefined ? `Room ${room}` : null].filter(Boolean).join(" · ") || undefined}
@@ -90,7 +91,7 @@ export default async function ChecklistPage({ searchParams }: PageProps<"/checkl
                         <form action={toggleChecklistItem}>
                           <input type="hidden" name="id" value={item.id} />
                           <SubmitButton aria-label={item.isDone ? `Mark "${item.title}" as not done` : `Mark "${item.title}" as done`}
-                            className={`grid h-11 w-11 cursor-pointer place-items-center rounded-full border-2 transition-colors ${
+                            className={`grid h-11 w-11 cursor-pointer place-items-center rounded-full border-2 transition-colors disabled:opacity-50 ${
                               item.isDone ? "border-ink bg-ink text-cream" : "border-dashed border-ink/40 hover:border-ink"
                             }`}>
                             {item.isDone && <IconCheck width={18} height={18} strokeWidth={3} />}

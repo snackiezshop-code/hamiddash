@@ -52,7 +52,7 @@ export function BankAccount({ bank, account, holder }: { bank: string | null; ac
       </span>
       <button type="button" onClick={copy} aria-label={copied ? "Copied" : `Copy account number ${account}`}
         title={copied ? "Copied" : "Copy account number"}
-        className={`grid h-8 w-8 cursor-pointer place-items-center rounded-full transition-colors ${
+        className={`-my-1.5 grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-colors ${
           copied ? "bg-mint text-mint-deep" : "text-ink-soft hover:bg-white hover:text-ink"
         }`}>
         {copied ? <IconCheck width={16} height={16} strokeWidth={3} /> : <IconCopy width={16} height={16} />}

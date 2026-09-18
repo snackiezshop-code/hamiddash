@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { STATUS_LABEL, STATUS_OPTIONS, dateInputValue, periodLabel, periodSlug, rupiah } from "@/lib/format";
 import { updateRoom } from "@/app/actions";
 import { PageHeader, Section, StatusPill, WaButton } from "@/components/ui";
-import { SubmitButton } from "@/components/forms";
+import { AmountInput, SubmitButton } from "@/components/forms";
 import { SelectPill } from "@/components/kit-client";
 import { IconChevronLeft } from "@/components/icons";
 
@@ -26,7 +26,7 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
 
   return (
     <>
-      <Link href="/kamar" className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-ink-soft hover:text-ink">
+      <Link href="/kamar" className="mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-ink-soft hover:text-ink">
         <IconChevronLeft width={16} height={16} /> All rooms
       </Link>
       <PageHeader title={`Room ${room.number}`} subtitle={<StatusPill status={room.status} />}
@@ -45,7 +45,7 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
               </div>
               <div>
                 <label className="label" htmlFor="monthlyRent">Monthly rent (Rp)</label>
-                <input id="monthlyRent" name="monthlyRent" inputMode="numeric" defaultValue={room.monthlyRent} className="field num" required />
+                <AmountInput id="monthlyRent" name="monthlyRent" defaultValue={room.monthlyRent} className="field num" required />
               </div>
             </div>
             <p className="mt-2 text-xs text-ink-soft">Changing the status also updates this room&apos;s row in the latest month&apos;s cash book.</p>

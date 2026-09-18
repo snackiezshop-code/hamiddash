@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { periodLabel } from "@/lib/format";
+import { periodLabel, periodSlug } from "@/lib/format";
 import { BottomBar, Sidebar } from "@/components/nav";
 import { QuickAddProvider, type QuickAddData } from "@/components/quick-add";
 
@@ -35,12 +35,15 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     rooms: rooms.map((r) => ({ id: r.id, number: r.number })),
   };
 
+  // Straight to the latest month: /kas only redirects there, which shows a blank screen mid-hop.
+  const cashHref = latest ? `/kas/${periodSlug(latest.year, latest.month)}` : "/kas";
+
   return (
     <QuickAddProvider data={quickAdd}>
-      <div className="mx-auto flex max-w-[1400px] gap-6 p-4 md:p-4">
-        <Sidebar reminders={reminders} />
-        <main className="min-w-0 flex-1 pb-36 md:py-4 md:pr-2 md:pb-8">{children}</main>
-        <BottomBar />
+      <div className="safe-gutter mx-auto flex max-w-[1400px] gap-6 pb-4">
+        <Sidebar reminders={reminders} cashHref={cashHref} />
+        <main className="min-w-0 flex-1 pb-[calc(9rem+env(safe-area-inset-bottom))] md:py-4 md:pr-2 md:pb-8">{children}</main>
+        <BottomBar cashHref={cashHref} />
       </div>
     </QuickAddProvider>
   );

@@ -6,11 +6,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { STATUS_LABEL, STATUS_TONE, TONE_CLASS } from "@/lib/format";
 import { IconSearch } from "./icons";
+import { useRoomDrawer } from "./room-drawer";
 
 export type SearchRoom = { number: number; status: RoomStatus; tenant: string | null; phone: string | null };
 
 export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
   const router = useRouter();
+  const openRoom = useRoomDrawer();
   const ref = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -35,15 +37,16 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  // Phones get the room drawer (same as the Rooms list); desktop goes to the room page.
   const go = (n: number) => {
     setOpen(false);
     setQuery("");
-    router.push(`/kamar/${n}`);
+    if (!openRoom(n)) router.push(`/kamar/${n}`);
   };
 
   return (
     <div ref={ref} className="relative w-full max-w-md">
-      <label className="flex items-center gap-2 h-11 rounded-full border border-line bg-white px-4 focus-within:border-ink">
+      <label className="flex items-center gap-2 h-11 rounded-full border border-line bg-white px-4 focus-within:border-ink focus-within:ring-1 focus-within:ring-ink">
         <IconSearch width={18} height={18} className="shrink-0 text-ink-soft" />
         <input
           type="search"
@@ -53,7 +56,7 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
           role="combobox"
           aria-expanded={open && query.trim() !== ""}
           aria-controls="room-search-results"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft/70"
+          className="w-full bg-transparent text-sm outline-none! placeholder:text-ink-soft/70"
           onFocus={() => setOpen(true)}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -84,7 +87,7 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
             <li className="px-5 py-3 text-sm text-ink-soft">No matches</li>
           ) : results.map((r, i) => (
             <li key={r.number} role="option" aria-selected={i === active}>
-              <Link href={`/kamar/${r.number}`} onClick={() => go(r.number)} onMouseEnter={() => setActive(i)}
+              <Link href={`/kamar/${r.number}`} onClick={(e) => { e.preventDefault(); go(r.number); }} onMouseEnter={() => setActive(i)}
                 className={`flex items-center justify-between gap-3 px-5 py-2.5 ${i === active ? "bg-cream" : ""}`}>
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold">Room {r.number} · {r.tenant ?? "No tenant"}</span>

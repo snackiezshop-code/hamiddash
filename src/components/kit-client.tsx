@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { CaretDown, Check, X } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
+import { errorDetails, reportClientIssue } from "@/lib/client-log";
 
 // Dashed ring = secondary (close/back), solid ink = primary (confirm/add) (brief 6.11).
 export function HeaderButton({ variant, className = "", children, ...rest }: ComponentProps<"button"> & { variant: "dashed" | "solid" }) {
@@ -73,7 +76,7 @@ export function Sheet({ open, onClose, title, children, headerRight }: {
 
   return (
     <dialog {...dialog} aria-labelledby={titleId}
-      className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[28px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[28px]">
+      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[28px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[28px]">
       <div className="px-5 pt-4" style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
         <SheetHeader titleId={titleId} title={title} onClose={onClose} right={headerRight} />
@@ -111,7 +114,7 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
 
   return (
     <dialog {...dialog} aria-labelledby={titleId}
-      className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[28px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[28px]">
+      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[28px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[28px]">
       {open && (
         <form
           className="px-5 pt-4"
@@ -122,7 +125,8 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
               const res = await action(fd);
               if (typeof res === "string") setError(res);
               else onClose();
-            } catch {
+            } catch (err) {
+              reportClientIssue("form-save-failed", { form: title, ...errorDetails(err) });
               setError("Couldn't save. Check your connection and try again.");
             }
           }}>
@@ -149,7 +153,8 @@ function SubmitWide({ label }: { label: string }) {
 export type SelectOption = { value: string; label: string; hint?: string };
 
 // Pill dropdown replacing native <select> (brief 6.7). Listbox pattern: arrows, Home/End, Enter/Space, Escape, type-ahead.
-export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, ariaLabel, icon: Glyph, className = "", tone = "bg-cream-2", disabled }: {
+// `required`: starts with nothing chosen and blocks the form's submit until an option is picked.
+export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, ariaLabel, icon: Glyph, className = "", tone = "bg-cream-2", disabled, required, requiredMessage = "Choose an option" }: {
   name?: string;
   options: SelectOption[];
   defaultValue?: string;
@@ -160,8 +165,11 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
   className?: string;
   tone?: string;
   disabled?: boolean;
+  required?: boolean;
+  requiredMessage?: string;
 }) {
-  const [value, setValue] = useState(defaultValue ?? options[0]?.value ?? "");
+  const [value, setValue] = useState(defaultValue ?? (required ? "" : options[0]?.value ?? ""));
+  const [invalid, setInvalid] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -194,6 +202,7 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
     buttonRef.current?.focus();
     if (v === undefined || v === value) return;
     setValue(v);
+    setInvalid(false);
     if (inputRef.current) inputRef.current.value = v;
     onChange?.(v);
     if (autoSubmit) inputRef.current?.form?.requestSubmit();
@@ -224,31 +233,39 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
-      {name && <input ref={inputRef} type="hidden" name={name} defaultValue={value} />}
+      {name && !required && <input ref={inputRef} type="hidden" name={name} defaultValue={value} />}
+      {/* Hidden inputs can't be `required`, so a required pill carries a visually hidden text input instead. */}
+      {name && required && (
+        <input ref={inputRef} name={name} defaultValue={value} required tabIndex={-1} aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-0"
+          onInvalid={(e) => { e.preventDefault(); setInvalid(true); buttonRef.current?.focus(); }} />
+      )}
       <button ref={buttonRef} type="button" role="combobox" disabled={disabled || pending}
         aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`} aria-label={`${ariaLabel}: ${selected?.label ?? "none"}`}
         aria-activedescendant={open ? `${id}-opt-${active}` : undefined}
+        aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-err` : undefined}
         onClick={() => (open ? setOpen(false) : openList())} onKeyDown={onKeyDown}
-        className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-full px-4 text-left text-sm font-semibold disabled:opacity-60 ${tone}`}>
+        className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-full px-4 text-left text-sm font-semibold disabled:opacity-60 ${tone} ${invalid ? "ring-2 ring-blush-deep" : ""}`}>
         {Glyph && <Glyph size={18} weight="duotone" className="shrink-0" aria-hidden />}
-        <span className="min-w-0 flex-1 truncate">{selected?.label ?? "Choose…"}</span>
+        <span className={`min-w-0 flex-1 truncate ${selected ? "" : "font-normal text-ink-soft"}`}>{selected?.label ?? "Choose…"}</span>
         <CaretDown size={16} weight="bold" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
       </button>
       {open && (
         <ul ref={listRef} id={`${id}-list`} role="listbox" aria-label={ariaLabel}
-          className="absolute z-50 mt-1.5 max-h-64 min-w-full overflow-y-auto rounded-3xl bg-white py-1.5 shadow-xl">
+          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-3xl bg-white py-1.5 shadow-xl">
           {options.map((o, i) => (
             <li key={o.value} id={`${id}-opt-${i}`} data-index={i} role="option" aria-selected={o.value === value}
               onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(i)}
               className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 text-sm whitespace-nowrap ${
                 i === active ? "bg-cream-2" : ""
               } ${o.value === value ? "font-semibold" : ""}`}>
-              <span>{o.label}{o.hint && <span className="ml-2 text-xs text-ink-soft">{o.hint}</span>}</span>
+              <span className="min-w-0 truncate">{o.label}{o.hint && <span className="ml-2 text-xs text-ink-soft">{o.hint}</span>}</span>
               {o.value === value && <Check size={16} weight="bold" aria-hidden />}
             </li>
           ))}
         </ul>
       )}
+      {invalid && <p id={`${id}-err`} className="mt-1.5 text-xs font-semibold text-blush-deep">{requiredMessage}</p>}
     </div>
   );
 }
@@ -306,5 +323,37 @@ export function Field({ label, htmlFor, children }: { label: string; htmlFor?: s
       <label className="label" htmlFor={htmlFor}>{label}</label>
       {children}
     </div>
+  );
+}
+
+// Solid ink pill for the selected tab, plain text for the rest (brief 6.4).
+// The pill jumps to a tapped tab at once; these links only change the query string, so the
+// route's loading skeleton never shows and the server round trip would otherwise look like no response.
+export function SegmentedLinks({ label, items }: { label: string; items: { href: string; label: string; active: boolean }[] }) {
+  const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const here = `${pathname}?${search}`;
+  const [tap, setTap] = useState<{ href: string; from: string } | null>(null);
+  const tapped = tap && tap.from === here ? tap.href : null;
+
+  return (
+    <nav aria-label={label} className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul className="flex w-max sm:gap-1">
+        {items.map((it) => {
+          const active = tapped ? tapped === it.href : it.active;
+          return (
+            <li key={it.href}>
+              <Link href={it.href} scroll={false} aria-current={active ? "page" : undefined}
+                onClick={(e) => { if (!e.metaKey && !e.ctrlKey) setTap({ href: it.href, from: here }); }}
+                className={`inline-flex min-h-11 items-center rounded-full px-2.5 text-sm sm:px-4 font-semibold whitespace-nowrap transition-colors ${
+                  active ? "bg-ink text-cream" : "text-ink-soft hover:text-ink"
+                }`}>
+                {it.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

@@ -2,21 +2,25 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getLatestPeriod, summarize } from "@/lib/cashbook";
 import {
-  STATUS_TONE, TONE_CLASS, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, todayJakarta,
+  STATUS_TONE, TONE_CLASS, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, todayJakarta, waLink,
 } from "@/lib/format";
+import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
+import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
 import { markRoomPaid, startPeriod, toggleTransfer } from "@/app/actions";
 import { Empty, MiniBars, PageHeader, Section, Sparkline, StatCard, StatusPill, WaButton } from "@/components/ui";
 import { AlertCallout, Avatar, Chevron, CountPill, IconBadge, ListRow, OCCUPANCY_SEGMENTS, PASTEL_BG, SegmentedRing, taskCategoryMeta } from "@/components/kit";
 import { SubmitButton } from "@/components/forms";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
 import { RoomSearch } from "@/components/room-search";
+import { RoomDrawerProvider, RoomLink } from "@/components/room-drawer";
+import { AccountButton } from "@/components/nav";
 import { IconCalendar, IconCheck, IconSettings, IconWallet } from "@/components/icons";
 
 export default async function DashboardPage() {
   const now = todayJakarta();
   const [latest, rooms, periods, openTasks] = await Promise.all([
     getLatestPeriod(),
-    db.room.findMany({ orderBy: { number: "asc" }, include: { tenant: true } }),
+    db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
     db.cashPeriod.findMany({
       orderBy: [{ year: "asc" }, { month: "asc" }],
       include: { roomIncomes: true, additionalIncomes: true, expenses: true },
@@ -48,10 +52,18 @@ export default async function DashboardPage() {
     .sort((a, b) => a.tenant!.leaseEndDate!.getTime() - b.tenant!.leaseEndDate!.getTime());
 
   const label = latest ? periodLabel(latest.year, latest.month) : "";
-  const transfersDone = latest?.transferChecks.filter((t) => t.isSent).length ?? 0;
+  // Only Max, BNI and this month's heir are due; the other heirs are shown faded with their month.
+  const transfers = (latest?.transferChecks ?? [])
+    .map((t) => ({ t, due: transferDue(t.recipientId, latest!.year, latest!.month) }))
+    .sort((a, b) => dueOrder(a.due) - dueOrder(b.due));
+  const transfersDue = transfers.filter((x) => isDue(x.due));
+  const transfersDone = transfersDue.filter((x) => x.t.isSent).length;
 
   const latestSlug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
   const dueTodayIds = new Set(dueToday.map((d) => d.id));
+  const attention = unpaid
+    .map((inc) => ({ inc, reminderToday: dueTodayIds.has(inc.id) }))
+    .sort((a, b) => Number(b.reminderToday) - Number(a.reminderToday) || a.inc.room.number - b.inc.room.number);
   const notifications: Notification[] = [
     ...(needsNewPeriod ? [{
       id: "new-period", tone: "butter" as const,
@@ -59,12 +71,18 @@ export default async function DashboardPage() {
       detail: "This month's cash book hasn't been created yet",
       href: "/",
     }] : []),
-    ...dueToday.map((inc) => ({
-      id: `due-${inc.id}`, tone: "butter" as const,
-      title: `Send reminder · Room ${inc.room.number}`,
-      detail: `${inc.room.tenant?.name ?? "Tenant"} · reminder day is today`,
-      href: `/kamar/${inc.room.number}`,
-    })),
+    // Opens the pre-filled WhatsApp reminder itself; without a usable number it falls back to the room.
+    ...dueToday.map((inc) => {
+      const wa = waLink(inc.room.tenant?.phone, reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month));
+      return {
+        id: `due-${inc.id}`, tone: "butter" as const,
+        title: `Send reminder · Room ${inc.room.number}`,
+        detail: `${inc.room.tenant?.name ?? "Tenant"} · ${wa ? "opens WhatsApp" : "no WhatsApp number saved"}`,
+        href: wa ?? `/kamar/${inc.room.number}`,
+        external: Boolean(wa),
+        roomNumber: wa ? undefined : inc.room.number,
+      };
+    }),
     ...unpaid.filter((inc) => !dueTodayIds.has(inc.id)).map((inc) => ({
       id: `unpaid-${inc.id}`, tone: "blush" as const,
       title: `Room ${inc.room.number} hasn't paid`,
@@ -83,24 +101,26 @@ export default async function DashboardPage() {
       detail: `${t.title} · due ${formatDate(t.dueDate)}`,
       href: "/checklist",
     })),
-    ...(latest && transfersDone < latest.transferChecks.length ? [{
+    ...(latest && transfersDone < transfersDue.length ? [{
       id: "transfers", tone: "peri" as const,
-      title: `${latest.transferChecks.length - transfersDone} transfers not sent`,
+      title: `${transfersDue.length - transfersDone} transfers not sent`,
       detail: `Transfer checklist for ${label}`,
       href: `/kas/${latestSlug}`,
     }] : []),
   ];
 
   return (
-    <>
+    <RoomDrawerProvider rooms={rooms.map(toDrawerRoom)}>
       <PageHeader
         title="Hello, Max."
         subtitle={
           <div className="mt-3 flex items-center gap-2">
+            <AccountButton className="md:hidden" />
             <RoomSearch rooms={rooms.map((r) => ({
               number: r.number, status: r.status, tenant: r.tenant?.name ?? null, phone: r.tenant?.phone ?? null,
             }))} />
-            <div className="flex shrink-0 items-center gap-2 md:hidden">
+            {/* relative: the bell's panel anchors to this row's right edge, not the bell's, so it stays on screen. */}
+            <div className="relative flex shrink-0 items-center gap-2 md:hidden">
               <NotificationBell notifications={notifications} />
               <Link href="/pengaturan" aria-label="Settings"
                 className="grid h-11 w-11 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:bg-cream-2">
@@ -174,49 +194,40 @@ export default async function DashboardPage() {
         <Section title="Room status" action={<Link href="/kamar" className="text-sm font-semibold underline-offset-4 hover:underline">Manage</Link>}>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {rooms.map((r) => (
-              <Link key={r.id} href={`/kamar/${r.number}`}
+              <RoomLink key={r.id} roomNumber={r.number}
                 className={`rounded-2xl p-3 transition-transform hover:-translate-y-0.5 ${TONE_CLASS[STATUS_TONE[r.status]]}`}>
                 <div className="flex items-center justify-between">
                   <span className="h-display text-lg">R{r.number}</span>
                   <StatusPill status={r.status} />
                 </div>
                 <div className="mt-2 truncate text-xs font-semibold">{r.tenant?.name ?? "No tenant"}</div>
-                <div className="num text-xs opacity-75">{rupiahShort(r.monthlyRent)}</div>
-              </Link>
+                <div className="num text-xs">{rupiahShort(r.monthlyRent)}</div>
+              </RoomLink>
             ))}
           </div>
         </Section>
 
         <div className="flex min-w-0 flex-col gap-4">
-          {dueToday.length > 0 && (
-            <Section title="Reminders due today" action={<CountPill n={dueToday.length} />}>
-              <ul className="divide-y divide-line">
-                {dueToday.map((inc) => (
-                  <li key={inc.id}>
-                    <ListRow
-                      leading={<Avatar name={inc.room.tenant?.name ?? "?"} tone="butter" />}
-                      title={`Room ${inc.room.number} · ${inc.room.tenant?.name ?? "No tenant"}`}
-                      subtitle={<span className="num">{rupiah(inc.room.monthlyRent)}</span>}
-                      trailing={<WaButton iconOnly phone={inc.room.tenant?.phone} label={`Remind ${inc.room.tenant?.name ?? "tenant"} on WhatsApp`}
-                        text={reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month)} />} />
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          <Section title="Unpaid rent" action={unpaid.length > 0 ? <CountPill n={unpaid.length} /> : undefined}>
+          {/* One list per room with a tag per reason. Reminder-day rooms are a subset of the unpaid ones,
+              so they're listed first rather than in a section of their own. */}
+          <Section title="Needs attention" action={attention.length > 0 ? <CountPill n={attention.length} /> : undefined}>
             <div id="unpaid" className="scroll-mt-4" />
-            {unpaid.length === 0 ? (
-              <Empty>No unpaid rent for {label}.</Empty>
+            {attention.length === 0 ? (
+              <Empty>Nothing needs attention for {label}.</Empty>
             ) : (
               <ul className="divide-y divide-line">
-                {unpaid.map((inc) => (
+                {attention.map(({ inc, reminderToday }) => (
                   <li key={inc.id}>
                     <ListRow
-                      leading={<Avatar name={inc.room.tenant?.name ?? "?"} tone="blush" />}
+                      leading={<Avatar name={inc.room.tenant?.name ?? "?"} tone={reminderToday ? "butter" : "blush"} />}
                       title={`Room ${inc.room.number} · ${inc.room.tenant?.name ?? "No tenant"}`}
-                      subtitle={<span className="num">{rupiah(inc.room.monthlyRent)}</span>}
+                      subtitle={
+                        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                          <span className="num">{rupiah(inc.room.monthlyRent)}</span>
+                          <span className="pill bg-blush py-0 text-blush-deep">Unpaid</span>
+                          {reminderToday && <span className="pill bg-butter py-0 text-butter-deep">Reminder today</span>}
+                        </span>
+                      }
                       trailing={
                         <div className="flex shrink-0 gap-2">
                           <WaButton iconOnly phone={inc.room.tenant?.phone} label={`Remind ${inc.room.tenant?.name ?? "tenant"} on WhatsApp`}
@@ -236,16 +247,22 @@ export default async function DashboardPage() {
             )}
           </Section>
 
-          {latest && latest.transferChecks.length > 0 && (
-            <Section title="Transfers this month" action={<span className="pill bg-cream">{transfersDone}/{latest.transferChecks.length}</span>}>
+          {transfers.length > 0 && (
+            <Section title="Transfers this month" action={<span className="pill bg-cream">{transfersDone}/{transfersDue.length}</span>}>
               <ul className="flex flex-wrap gap-2">
-                {latest.transferChecks.map((t) => (
+                {transfers.map(({ t, due }) => (
                   <li key={t.id}>
                     <form action={toggleTransfer}>
                       <input type="hidden" name="id" value={t.id} />
-                      <button className={`pill cursor-pointer py-1.5 ${t.isSent ? "bg-mint text-mint-deep" : "bg-cream text-ink-soft"}`}>
+                      <SubmitButton className={`pill min-h-11 cursor-pointer px-3.5 disabled:opacity-50 ${
+                        t.isSent ? "bg-mint text-mint-deep"
+                          : due.kind === "turn" ? "bg-butter text-butter-deep"
+                          : isDue(due) ? "bg-cream text-ink-soft"
+                          : "border border-dashed border-line text-ink-soft"
+                      }`}>
                         {t.isSent ? "✓" : "○"} {t.recipient.name}
-                      </button>
+                        <span className="font-medium opacity-75">· {dueLabel(due)}</span>
+                      </SubmitButton>
                     </form>
                   </li>
                 ))}
@@ -291,6 +308,6 @@ export default async function DashboardPage() {
           </Section>
         </div>
       </div>
-    </>
+    </RoomDrawerProvider>
   );
 }

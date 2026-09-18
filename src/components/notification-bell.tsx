@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { IconBell } from "./icons";
+import { RoomLink } from "./room-drawer";
 
 export type Notification = {
   id: string;
@@ -10,6 +11,8 @@ export type Notification = {
   title: string;
   detail: string;
   href: string;
+  external?: boolean; // e.g. a wa.me link: opens in a new tab
+  roomNumber?: number; // opens the room drawer on phones instead of navigating
 };
 
 const DOT: Record<Notification["tone"], string> = {
@@ -40,7 +43,8 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    // Phones anchor the panel to the positioned parent row (the settings button sits to the bell's right).
+    <div ref={ref} className="md:relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -70,14 +74,13 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
             <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto">
               {notifications.map((n) => (
                 <li key={n.id}>
-                  <Link href={n.href} onClick={() => setOpen(false)}
-                    className="flex items-start gap-3 px-5 py-3 hover:bg-cream/60">
+                  <NotificationLink n={n} onClick={() => setOpen(false)}>
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${DOT[n.tone]}`} aria-hidden />
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold">{n.title}</span>
                       <span className="block text-xs text-ink-soft">{n.detail}</span>
                     </span>
-                  </Link>
+                  </NotificationLink>
                 </li>
               ))}
             </ul>
@@ -86,4 +89,15 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
       )}
     </div>
   );
+}
+
+function NotificationLink({ n, onClick, children }: { n: Notification; onClick: () => void; children: React.ReactNode }) {
+  const className = "flex items-start gap-3 px-5 py-3 hover:bg-cream/60";
+  if (n.external) {
+    return <a href={n.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{children}</a>;
+  }
+  if (n.roomNumber !== undefined) {
+    return <RoomLink roomNumber={n.roomNumber} onClick={onClick} className={className}>{children}</RoomLink>;
+  }
+  return <Link href={n.href} onClick={onClick} className={className}>{children}</Link>;
 }

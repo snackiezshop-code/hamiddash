@@ -10,9 +10,11 @@
   --color-mint: #cfe8d2;
   --color-mint-deep: #2e6b45;
   --color-blush: #f6cbc2;
-  --color-blush-deep: #a23b2b;
+  /* Deep tones are the text colour on their pastel: blush-deep 4.96:1, butter-deep 5.02:1 (WCAG AA,
+     13px pill text counts as normal text). Pastel backgrounds are unchanged. */
+  --color-blush-deep: #983527;
   --color-butter: #f6de93;
-  --color-butter-deep: #8a6a12;
+  --color-butter-deep: #745810;
   --color-peri: #cdd6f3;
   --color-peri-deep: #34428c;
 
@@ -66,6 +68,8 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* Unlayered, so it outranks Tailwind's `outline-none`. Inputs sitting inside a pill that draws
+   its own focus-within ring opt out with `outline-none!`. */
 :focus-visible {
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;
@@ -74,7 +78,39 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
+}
+
+/* Sheets (native <dialog>) slide up on phones and fade in from md up, on open only: closing
+   unmounts their content, so an exit animation would slide an empty panel. 200ms ease-out
+   matches the app's transition-colors duration-200. */
+dialog.sheet[open] {
+  animation: sheet-up 200ms ease-out;
+}
+dialog.sheet[open]::backdrop {
+  animation: sheet-fade 200ms ease-out;
+}
+@media (min-width: 48rem) {
+  dialog.sheet[open] {
+    animation-name: sheet-pop;
+  }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+}
+@keyframes sheet-pop {
+  from { opacity: 0; transform: scale(0.97); }
+}
+@keyframes sheet-fade {
+  from { opacity: 0; }
+}
+
+/* Page gutters that clear the notch/rounded corners once viewport-fit=cover is on (landscape sides, standalone top). */
+@utility safe-gutter {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
 }
 
 @utility card {

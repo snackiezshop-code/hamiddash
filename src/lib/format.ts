@@ -6,7 +6,7 @@ export const MONTHS = [
 ];
 
 export function rupiah(n: number) {
-  return "Rp" + n.toLocaleString("id-ID");
+  return (n < 0 ? "-Rp" : "Rp") + Math.abs(n).toLocaleString("id-ID");
 }
 
 export function rupiahShort(n: number) {
@@ -32,6 +32,12 @@ export function parsePeriodSlug(slug: string) {
   const month = Number(m[2]);
   if (month < 1 || month > 12) return null;
   return { year, month };
+}
+
+// Later than Jakarta's current month.
+export function isFuturePeriod(year: number, month: number) {
+  const now = todayJakarta();
+  return year * 12 + month > now.getUTCFullYear() * 12 + now.getUTCMonth() + 1;
 }
 
 export function shiftMonth(year: number, month: number, delta: number) {

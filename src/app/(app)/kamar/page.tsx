@@ -4,7 +4,8 @@ import { STATUS_LABEL, STATUS_OPTIONS, formatDate, rupiah } from "@/lib/format";
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { PageHeader, StatusPill, WaButton } from "@/components/ui";
 import { RoomsMobileList } from "@/components/room-drawer";
-import { SegmentedLinks } from "@/components/kit";
+import { SegmentedLinks } from "@/components/kit-client";
+import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 
 export default async function RoomsPage({ searchParams }: PageProps<"/kamar">) {
   const { status } = await searchParams;
@@ -13,14 +14,7 @@ export default async function RoomsPage({ searchParams }: PageProps<"/kamar">) {
     db.room.findMany({
       where: filter ? { status: filter } : {},
       orderBy: { number: "asc" },
-      include: {
-        tenant: true,
-        roomIncomes: {
-          include: { period: true },
-          orderBy: [{ period: { year: "desc" } }, { period: { month: "desc" } }],
-          take: 6,
-        },
-      },
+      include: drawerRoomInclude,
     }),
     db.room.findMany({ select: { status: true, monthlyRent: true } }),
   ]);
@@ -81,14 +75,7 @@ export default async function RoomsPage({ searchParams }: PageProps<"/kamar">) {
           </tbody>
         </table>
 
-        <RoomsMobileList rooms={rooms.map((r) => ({
-          id: r.id, number: r.number, status: r.status, monthlyRent: r.monthlyRent,
-          tenant: r.tenant && {
-            name: r.tenant.name, phone: r.tenant.phone, reminderDay: r.tenant.reminderDay,
-            moveInDate: r.tenant.moveInDate, leaseEndDate: r.tenant.leaseEndDate, notes: r.tenant.notes,
-          },
-          history: r.roomIncomes.map((h) => ({ id: h.id, year: h.period.year, month: h.period.month, status: h.status, amount: h.amount })),
-        }))} />
+        <RoomsMobileList rooms={rooms.map(toDrawerRoom)} />
         {rooms.length === 0 && <p className="p-6 text-center text-sm text-ink-soft">No rooms with this status.</p>}
       </div>
     </>

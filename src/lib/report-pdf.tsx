@@ -24,7 +24,8 @@ export const bulanLabel = (year: number, month: number) => `${BULAN[month - 1]} 
 // Hide descriptions that only repeat the category (e.g. "Listrik" under Listrik).
 const keterangan = (c: ExpenseCategory, d: string) =>
   [ "-", KATEGORI_ID[c].toLowerCase(), CATEGORY_LABEL[c].toLowerCase()].includes(d.trim().toLowerCase()) ? "" : d;
-const rp = (n: number) => (n ? `Rp${n.toLocaleString("en-US")}` : "-");
+// Dot thousands separators, same as the app (rupiah() in format.ts).
+const rp = (n: number) => (n ? `Rp${n.toLocaleString("id-ID")}` : "-");
 
 const C = {
   navy: "#1F3B57",

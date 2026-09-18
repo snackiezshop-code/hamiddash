@@ -1,3 +1,5 @@
+import { todayJakarta } from "@/lib/format";
+
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -7,16 +9,17 @@ const MONTH_NAMES = [
 export type ReminderEntry = { day: number; roomNumber: number; name: string };
 
 export function MiniCalendar({ reminders }: { reminders: ReminderEntry[] }) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const today = now.getDate();
+  // Jakarta's date, so the server render (UTC on Vercel) and the phone agree on "today".
+  const now = todayJakarta();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const today = now.getUTCDate();
 
   const remindersByDay = new Map<number, ReminderEntry[]>();
   for (const r of reminders) remindersByDay.set(r.day, [...(remindersByDay.get(r.day) ?? []), r]);
 
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const leadingBlanks = (new Date(year, month, 1).getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const leadingBlanks = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7; // Monday-first
   const cells = [...Array(leadingBlanks).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   return (
@@ -27,7 +30,7 @@ export function MiniCalendar({ reminders }: { reminders: ReminderEntry[] }) {
       </div>
       <div className="grid grid-cols-7 gap-y-1 text-center">
         {WEEKDAYS.map((w, i) => (
-          <span key={i} className="text-[10px] font-semibold text-cream/40">{w}</span>
+          <span key={i} className="text-[10px] font-semibold text-cream/60">{w}</span>
         ))}
         {cells.map((day, i) => {
           if (day === null) return <span key={`b${i}`} />;

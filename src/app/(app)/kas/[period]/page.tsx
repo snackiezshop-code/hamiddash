@@ -1,21 +1,22 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getPeriod, summarize } from "@/lib/cashbook";
 import {
   CATEGORY_LABEL, STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
-  parsePeriodSlug, periodLabel, periodSlug, reminderText, rupiah, shiftMonth,
+  isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, reminderText, rupiah, shiftMonth,
 } from "@/lib/format";
 import {
   addAdditionalIncome, deleteAdditionalIncome, deleteExpense, startPeriod, toggleTransfer, updateRoomIncome,
 } from "@/app/actions";
 import { Empty, PageHeader, Section, StatCard, WaButton } from "@/components/ui";
 import { BankAccount } from "@/components/bank";
-import { AutoSubmitAmount, ConfirmButton, SubmitButton } from "@/components/forms";
-import { Avatar, CountPill, IconBadge, ListRow, EXPENSE_META, SegmentedLinks, STATUS_PASTEL } from "@/components/kit";
-import { SelectPill, SwitchSubmit } from "@/components/kit-client";
+import { AmountInput, AutoSubmitAmount, ConfirmButton, SubmitButton } from "@/components/forms";
+import { Avatar, CountPill, IconBadge, ListRow, EXPENSE_META, STATUS_PASTEL } from "@/components/kit";
+import { SegmentedLinks, SelectPill, SwitchSubmit } from "@/components/kit-client";
 import { MonthSelect } from "@/components/month-select";
 import { QuickAddButton } from "@/components/quick-add";
+import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
 import {
   IconAlert, IconCheck, IconChevronLeft, IconChevronRight, IconDownload, IconPlus, IconTrash, IconWallet,
 } from "@/components/icons";
@@ -43,6 +44,10 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
     db.cashPeriod.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }], select: { year: true, month: true } }),
   ]);
 
+  // A month that hasn't come yet can't be opened (or started) unless it somehow already exists.
+  if (!period && isFuturePeriod(year, month)) redirect("/kas");
+  const nextOpen = !isFuturePeriod(next.year, next.month) || allPeriods.some((p) => p.year === next.year && p.month === next.month);
+
   const monthOptions = allPeriods.map((p) => ({ value: periodSlug(p.year, p.month), label: periodLabel(p.year, p.month) }));
   if (!monthOptions.some((o) => o.value === slug)) {
     monthOptions.unshift({ value: slug, label: `${label} (not started)` });
@@ -58,9 +63,15 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
         <Link href={`/kas/${periodSlug(prev.year, prev.month)}`} className="btn-secondary btn-sm" aria-label="Previous month">
           <IconChevronLeft width={16} height={16} />
         </Link>
-        <Link href={`/kas/${periodSlug(next.year, next.month)}`} className="btn-secondary btn-sm" aria-label="Next month">
-          <IconChevronRight width={16} height={16} />
-        </Link>
+        {nextOpen ? (
+          <Link href={`/kas/${periodSlug(next.year, next.month)}`} className="btn-secondary btn-sm" aria-label="Next month">
+            <IconChevronRight width={16} height={16} />
+          </Link>
+        ) : (
+          <span className="btn-secondary btn-sm cursor-not-allowed opacity-40" aria-disabled="true" title="Next month hasn't started yet">
+            <IconChevronRight width={16} height={16} />
+          </span>
+        )}
       </div>
     </>
   );
@@ -84,7 +95,11 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
 
   const s = summarize(period);
   const paidCount = period.roomIncomes.filter((r) => r.status === "LUNAS").length;
-  const transfers = period.transferChecks.filter((t) => t.recipient.isActive || t.isSent);
+  // Max and BNI every month, plus the heir whose turn it is; the other heirs are listed after, faded.
+  const transfers = period.transferChecks
+    .filter((t) => t.recipient.isActive || t.isSent)
+    .map((t) => ({ ...t, due: transferDue(t.recipientId, year, month) }))
+    .sort((a, b) => dueOrder(a.due) - dueOrder(b.due));
   // On phones only the chosen tab's sections show; from md up everything shows as before.
   const on = (key: Tab, grid = false) =>
     tab === key ? (grid ? "grid" : "block") : grid ? "hidden md:grid" : "hidden md:block";
@@ -144,7 +159,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                       <label className="flex min-h-11 flex-1 items-center rounded-full bg-cream-2 px-4 focus-within:ring-2 focus-within:ring-ink sm:flex-none">
                         <span className="mr-1 text-xs text-ink-soft">Rp</span>
                         <AutoSubmitAmount name="amount" defaultValue={inc.amount} aria-label={`Amount for room ${inc.room.number}`}
-                          className="num w-full min-w-0 bg-transparent text-right text-sm outline-none sm:w-24" />
+                          className="num w-full min-w-0 bg-transparent text-right text-sm outline-none! sm:w-24" />
                       </label>
                     </div>
                   </form>
@@ -245,19 +260,22 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
               <input type="hidden" name="periodId" value={period.id} />
               <input name="description" required placeholder="Description" aria-label="Description" className="field col-span-2 sm:col-span-1" />
               <input name="source" placeholder="Source" aria-label="Source" className="field" />
-              <input name="amount" inputMode="numeric" required placeholder="Amount" aria-label="Amount" className="field num" />
-              <SubmitButton className="btn-primary col-span-2 sm:col-span-1" pendingText="…"><IconPlus width={16} height={16} /> Add</SubmitButton>
+              <AmountInput name="amount" required pattern="[0-9.,\s]*[1-9][0-9.,\s]*" title="Enter an amount above 0"
+                placeholder="Amount" aria-label="Amount" className="field num" />
+              <SubmitButton className="btn-primary col-span-2 sm:col-span-1" pendingText="Adding…"><IconPlus width={16} height={16} /> Add</SubmitButton>
             </form>
           </Section>
 
           <Section title="Transfer checklist" className={on("transfers")}
-            action={<CountPill n={transfers.filter((t) => !t.isSent).length} />}>
+            action={<CountPill n={transfers.filter((t) => isDue(t.due) && !t.isSent).length} />}>
             {transfers.length === 0 ? (
               <Empty>No recipients yet. Add them in <Link href="/pengaturan" className="underline">Settings</Link>.</Empty>
             ) : (
               <ul className="space-y-2">
                 {transfers.map((t) => (
-                  <li key={t.id} className={`rounded-3xl py-1 pr-3 pl-1 ${t.isSent ? "bg-mint" : "bg-cream"}`}>
+                  <li key={t.id} className={`rounded-3xl py-1 pr-3 pl-1 ${
+                    t.isSent ? "bg-mint" : t.due.kind === "turn" ? "bg-butter" : isDue(t.due) ? "bg-cream" : "border border-dashed border-line"
+                  }`}>
                     <div className="flex items-center gap-2">
                       <form action={toggleTransfer}>
                         <input type="hidden" name="id" value={t.id} />
@@ -269,9 +287,11 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                           {t.recipient.role && <span className="ml-1.5 text-xs font-normal text-ink-soft">· {t.recipient.role}</span>}
                         </div>
                         <div className="text-xs text-ink-soft">
+                          {t.due.kind === "later" ? `Turn in ${dueLabel(t.due)}` : dueLabel(t.due)}
+                          {" · "}
                           {t.isSent && t.sentAt
                             ? `Sent ${t.sentAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}`
-                            : "Not sent yet"}
+                            : isDue(t.due) ? "Not sent yet" : "Not due"}
                         </div>
                       </div>
                     </div>
