@@ -105,28 +105,29 @@ export function BottomBar({ cashHref }: { cashHref: string }) {
     const active = isOn(href);
     return (
       <Link key={href} href={to} onClick={onTap(href)} aria-current={active ? "page" : undefined}
-        className={`flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-0.5 text-[11px] font-semibold ${
+        className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] leading-3 font-semibold ${
           active ? "bg-cream text-ink" : "text-cream/75"
         }`}>
-        {/* Active tab: capsule shade, with the icon in its own circle inside it. */}
-        <span className={`grid h-7 w-7 place-items-center rounded-full ${active ? "bg-cream-2" : ""}`}>
-          <Icon width={20} height={20} />
+        {/* Active tab: a 56px circle shade holding icon + label ("Checklist" is the widest fit), icon in its own small circle. */}
+        <span className={`grid h-5 w-5 place-items-center rounded-full ${active ? "bg-cream-2" : ""}`}>
+          <Icon width={16} height={16} />
         </span>
         <span className="max-w-full truncate">{label.split(" ")[0]}</span>
       </Link>
     );
   };
   return (
-    <nav aria-label="Main" className="fixed bottom-3 left-1/2 z-40 flex w-[calc(100%-3rem)] max-w-[20rem] -translate-x-1/2 items-center rounded-[28px] bg-ink p-1.5 text-cream md:hidden"
+    // Spans the same width as the page column (its safe-gutter edges), fully rounded ends.
+    <nav aria-label="Main" className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-3 left-[max(1rem,env(safe-area-inset-left))] z-40 flex items-center rounded-full bg-ink p-1.5 text-cream md:hidden"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="flex flex-1 gap-0.5">{items.slice(0, 2).map(tab)}</div>
+      <div className="flex flex-1 justify-around">{items.slice(0, 2).map(tab)}</div>
       <div className="relative w-14 shrink-0 self-stretch">
         <button type="button" onClick={() => open("menu")} aria-label="Quick add" aria-haspopup="dialog"
           className="absolute -top-[34px] left-1/2 grid h-14 w-14 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-fab text-ink transition-transform active:scale-95">
           <Plus size={24} weight="bold" aria-hidden />
         </button>
       </div>
-      <div className="flex flex-1 gap-0.5">{items.slice(2).map(tab)}</div>
+      <div className="flex flex-1 justify-around">{items.slice(2).map(tab)}</div>
     </nav>
   );
 }
