@@ -184,14 +184,16 @@ export function AlertCallout({ eyebrow, children, action, tone = "blush" }: {
   eyebrow: string;
   children: ReactNode;
   action?: ReactNode;
-  tone?: "blush" | "mint";
+  tone?: "blush" | "mint" | "terra";
 }) {
+  const isTerra = tone === "terra";
+  const bg = isTerra ? "bg-terra" : tone === "mint" ? "bg-mint" : "bg-blush";
   return (
-    <section className={`card relative overflow-hidden ${tone === "blush" ? "bg-blush" : "bg-mint"}`}>
-      <svg viewBox="0 0 120 120" className="pointer-events-none absolute -right-6 -bottom-8 h-32 w-32 text-ink/[0.06]" aria-hidden>
+    <section className={`card relative overflow-hidden ${bg}${isTerra ? " text-[#F6F1E5]" : ""}`}>
+      <svg viewBox="0 0 120 120" className={`pointer-events-none absolute -right-6 -bottom-8 h-32 w-32 ${isTerra ? "text-white/20" : "text-ink/[0.06]"}`} aria-hidden>
         <path fill="currentColor" d="M60 8c16 0 24 14 36 22s22 22 16 40-24 20-36 32-26 16-40 6S14 80 10 64 12 30 26 20 44 8 60 8Z" />
       </svg>
-      <p className="relative text-xs font-semibold text-ink-soft">{eyebrow}</p>
+      <p className={`relative text-xs font-semibold ${isTerra ? "text-[#F6F1E5]/70" : "text-ink-soft"}`}>{eyebrow}</p>
       <div className="relative mt-1.5 font-display text-xl leading-snug font-bold tracking-tight">{children}</div>
       {action && <div className="relative mt-4">{action}</div>}
     </section>

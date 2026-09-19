@@ -126,7 +126,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
         <StatCard tone="blush" icon={<IconAlert />} label="Expenses" value={rupiah(s.expenseTotal)}
           footer={`${period.expenses.length} ${period.expenses.length === 1 ? "transaction" : "transactions"}`} />
         <StatCard tone="ink" icon={<IconWallet />} label="Closing balance" value={rupiah(s.closingBalance)}
-          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
+          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-[#F6F1E5]"}`}>
             Net cash flow {s.netFlow >= 0 ? "+" : ""}{rupiah(s.netFlow)}
           </span>} />
       </div>

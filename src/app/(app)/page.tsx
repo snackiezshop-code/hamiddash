@@ -112,7 +112,20 @@ export default async function DashboardPage() {
   return (
     <RoomDrawerProvider rooms={rooms.map(toDrawerRoom)}>
       <PageHeader
-        title="Hello, Max."
+        title="Hello, max!"
+        titleRight={
+          <span aria-hidden="true" className="shrink-0 self-center">
+            <svg viewBox="0 0 24 24" className="w-9 h-9 md:w-12 md:h-12" xmlns="http://www.w3.org/2000/svg">
+              <rect x="7" y="18" width="3" height="4" fill="var(--robot-dark)" />
+              <rect x="14" y="18" width="3" height="4" fill="var(--robot-dark)" />
+              <rect className="arm left" x="2" y="11" width="4" height="3" fill="var(--robot)" />
+              <rect className="arm right" x="18" y="11" width="4" height="3" fill="var(--robot)" />
+              <rect x="6" y="6" width="12" height="12" rx="1" fill="var(--robot)" />
+              <rect className="eye left" x="9" y="10" width="2" height="3" fill="var(--ink)" />
+              <rect className="eye right" x="13" y="10" width="2" height="3" fill="var(--ink)" />
+            </svg>
+          </span>
+        }
         subtitle={
           <div className="mt-3 flex items-center gap-2">
             <AccountButton className="md:hidden" />
@@ -151,7 +164,7 @@ export default async function DashboardPage() {
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard tone="ink" icon={<IconWallet />} label="Closing balance" value={rupiah(summary.closingBalance)}
             chart={<Sparkline values={closings.slice(-8)} />}
-            footer={<span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
+            footer={<span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-[#F6F1E5]"}`}>
               {summary.netFlow >= 0 ? "+" : ""}{rupiahShort(summary.netFlow)} this month
             </span>} />
           <section className="card flex flex-col items-center gap-3 bg-white sm:row-span-2 xl:row-span-1" aria-labelledby="occupancy-title">
@@ -179,10 +192,10 @@ export default async function DashboardPage() {
             ]} />}
             footer={`Expenses ${rupiah(summary.expenseTotal)}`} />
           {unpaid.length > 0 ? (
-            <AlertCallout eyebrow="Needs attention"
+            <AlertCallout tone="terra" eyebrow="Needs attention"
               action={<a href="#unpaid" className="btn-primary btn-sm">See who hasn&apos;t paid</a>}>
-              <span className="text-flag">{unpaid.length}</span> {unpaid.length === 1 ? "room hasn't" : "rooms haven't"} paid for {label}
-              <span className="mt-1 block font-sans text-sm font-semibold text-ink-soft">{rupiah(unpaidTotal)} still to collect</span>
+              <span className="text-[#F6F1E5]">{unpaid.length}</span> {unpaid.length === 1 ? "room hasn't" : "rooms haven't"} paid for {label}
+              <span className="mt-1 block font-sans text-sm font-semibold text-[#F6F1E5]/70">{rupiah(unpaidTotal)} still to collect</span>
             </AlertCallout>
           ) : (
             <AlertCallout tone="mint" eyebrow="Rent">All rent for {label} is in.</AlertCallout>
@@ -224,7 +237,7 @@ export default async function DashboardPage() {
                       subtitle={
                         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                           <span className="num">{rupiah(inc.room.monthlyRent)}</span>
-                          <span className="pill bg-blush py-0 text-blush-deep">Unpaid</span>
+                          <span className="pill bg-blush py-0 text-[#F6F1E5]">Unpaid</span>
                           {reminderToday && <span className="pill bg-butter py-0 text-butter-deep">Reminder today</span>}
                         </span>
                       }

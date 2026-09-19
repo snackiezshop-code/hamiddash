@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #f6f1e5;
-  --color-cream-2: #ece5d3;
+  --color-cream: #F0EBE2;
+  --color-cream-2: #E5DDD1;
   --color-ink: #17140f;
   --color-ink-soft: #5c554a;
   --color-line: #e2d9c4;
 
   --color-mint: #cfe8d2;
   --color-mint-deep: #2e6b45;
-  --color-blush: #f6cbc2;
+  --color-terra: #C96A52;
+  --color-blush: #C96A52;
   /* Deep tones are the text colour on their pastel: blush-deep 4.96:1, butter-deep 5.02:1 (WCAG AA,
      13px pill text counts as normal text). Pastel backgrounds are unchanged. */
   --color-blush-deep: #983527;
@@ -26,10 +27,10 @@
   /* Off-state switch track: 3.4:1 against its white knob, 3:1 against cream. */
   --color-track: #8f8a80;
 
-  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-gelasio), Georgia, serif;
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
-  --font-greeting: var(--font-dm-serif), ui-serif, Georgia, serif;
+  --font-greeting: var(--font-gelasio), Georgia, serif;
 
   /* Type scale: 13 / 16 / 17 / 20 / 24 / 28 / 32 / 40 — body text never below 16px */
   --text-xs: 0.8125rem;
@@ -50,6 +51,14 @@
   --text-4xl--line-height: 3rem;
 
   --radius-card: 24px;
+}
+
+:root {
+  /* Splash-page robot colors */
+  --robot: #C96A52;
+  --robot-dark: #A6543F;
+  /* Bare --ink alias used by the robot SVG fill */
+  --ink: #17140f;
 }
 
 html {
@@ -82,14 +91,35 @@ body {
   }
 }
 
+/* ── Robot (splash page + dashboard header) ──────────────────────────── */
+.robot-wrap { width: 72px; height: 72px; position: relative; }
+/* Body stays still; only the right arm waves */
+.robot { width: 100%; height: 100%; transform-origin: bottom center; }
+/* fill-box makes transform-origin relative to each rect's own bounding box */
+.robot rect.arm { transform-box: fill-box; }
+/* Right arm rotates from the shoulder (left edge, vertical center = 0% 50%) */
+.robot rect.arm.right {
+  transform-origin: 0% 50%;
+  animation: robot-wave 1.5s ease-in-out infinite;
+}
+.robot rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 2.6s ease-in-out infinite; }
+.robot rect.eye.right { animation-delay: 0.05s; }
+.splash-shadow { width: 40px; height: 8px; border-radius: 50%; background: rgba(23, 20, 15, 0.12); margin: 0 auto; }
+/* Two quick waves, then rest until next cycle */
+@keyframes robot-wave { 0%, 75%, 100% { transform: rotate(0deg); } 15% { transform: rotate(-55deg); } 30% { transform: rotate(-35deg); } 45% { transform: rotate(-55deg); } 60% { transform: rotate(-35deg); } }
+@keyframes robot-blink { 0%, 88%, 100% { transform: scaleY(1); } 92% { transform: scaleY(0.1); } }
+
 /* Sheets (native <dialog>) slide up on phones and fade in from md up, on open only: closing
-   unmounts their content, so an exit animation would slide an empty panel. 200ms ease-out
-   matches the app's transition-colors duration-200. */
+   unmounts their content, so an exit animation would slide an empty panel. 200ms standard
+   cubic-bezier matches the app's transition duration and GPU-composes on transform/opacity. */
+dialog.sheet {
+  will-change: transform, opacity;
+}
 dialog.sheet[open] {
-  animation: sheet-up 200ms ease-out;
+  animation: sheet-up 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 dialog.sheet[open]::backdrop {
-  animation: sheet-fade 200ms ease-out;
+  animation: sheet-fade 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (min-width: 48rem) {
   dialog.sheet[open] {
@@ -139,4 +169,7 @@ dialog.sheet[open]::backdrop {
 }
 @utility h-display {
   @apply font-display font-bold tracking-tight;
+}
+@utility font-splash {
+  font-family: var(--font-gelasio), Georgia, serif;
 }

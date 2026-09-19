@@ -7,17 +7,21 @@ export function StatusPill({ status }: { status: RoomStatus }) {
   return <span className={`pill ${TONE_CLASS[STATUS_TONE[status]]}`}>{STATUS_LABEL[status]}</span>;
 }
 
-export function PageHeader({ title, subtitle, actions, titleClassName = "font-greeting text-4xl leading-tight font-normal md:text-6xl", actionsClassName = "" }: {
+export function PageHeader({ title, subtitle, actions, titleRight, titleClassName = "font-greeting text-4xl leading-tight font-normal md:text-6xl", actionsClassName = "" }: {
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
+  titleRight?: ReactNode;
   titleClassName?: string;
   actionsClassName?: string;
 }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-[14rem] flex-1">
-        <h1 className={titleClassName}>{title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className={titleClassName}>{title}</h1>
+          {titleRight}
+        </div>
         {subtitle && <div className="mt-1 text-sm text-ink-soft">{subtitle}</div>}
       </div>
       {actions && <div className={`flex flex-wrap items-center gap-2 ${actionsClassName}`}>{actions}</div>}

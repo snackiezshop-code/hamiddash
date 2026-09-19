@@ -133,7 +133,7 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
           <SheetHeader titleId={titleId} title={title} onClose={onClose} right={canSubmit ? <SubmitCircle label={submitLabel} /> : undefined} />
           <div className="flex flex-col gap-4">{children}</div>
-          {error && <p role="alert" className="mt-4 rounded-2xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+          {error && <p role="alert" className="mt-4 rounded-2xl bg-blush px-4 py-3 text-sm font-semibold text-[#F6F1E5]">{error}</p>}
           {canSubmit && <SubmitWide label={submitLabel} />}
         </form>
       )}
@@ -248,7 +248,7 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
         className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-full px-4 text-left text-sm font-semibold disabled:opacity-60 ${tone} ${invalid ? "ring-2 ring-blush-deep" : ""}`}>
         {Glyph && <Glyph size={18} weight="duotone" className="shrink-0" aria-hidden />}
         <span className={`min-w-0 flex-1 truncate ${selected ? "" : "font-normal text-ink-soft"}`}>{selected?.label ?? "Choose…"}</span>
-        <CaretDown size={16} weight="bold" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+        <CaretDown size={16} weight="bold" className={`shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden />
       </button>
       {open && (
         <ul ref={listRef} id={`${id}-list`} role="listbox" aria-label={ariaLabel}
