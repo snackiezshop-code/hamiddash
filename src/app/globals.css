@@ -109,6 +109,18 @@ body {
 @keyframes robot-wave { 0%, 75%, 100% { transform: rotate(0deg); } 15% { transform: rotate(-55deg); } 30% { transform: rotate(-35deg); } 45% { transform: rotate(-55deg); } 60% { transform: rotate(-35deg); } }
 @keyframes robot-blink { 0%, 88%, 100% { transform: scaleY(1); } 92% { transform: scaleY(0.1); } }
 
+/* Dashboard greeting robot: hops with a squashing shadow. Lift is 20% of its height (14px at 72px). */
+.robot-bounce { animation: robot-bounce 1.1s ease-in-out infinite; }
+.robot-bounce rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 2.6s ease-in-out infinite; }
+.robot-bounce rect.eye.right { animation-delay: 0.05s; }
+.robot-bounce-shadow { background: rgba(23, 20, 15, 0.12); animation: robot-squash 1.1s ease-in-out infinite; }
+@keyframes robot-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20%); } }
+@keyframes robot-squash { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(0.7); opacity: 0.25; } }
+/* The global 0.01ms rule would make an infinite loop flicker, so stop it outright. */
+@media (prefers-reduced-motion: reduce) {
+  .robot-bounce, .robot-bounce rect.eye, .robot-bounce-shadow { animation: none !important; }
+}
+
 /* Sheets (native <dialog>) slide up on phones and fade in from md up, on open only: closing
    unmounts their content, so an exit animation would slide an empty panel. 200ms standard
    cubic-bezier matches the app's transition duration and GPU-composes on transform/opacity. */

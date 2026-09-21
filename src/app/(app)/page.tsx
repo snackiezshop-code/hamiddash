@@ -104,18 +104,19 @@ export default async function DashboardPage() {
   return (
     <RoomDrawerProvider rooms={rooms.map(toDrawerRoom)}>
       <PageHeader
-        title="Hello, max!"
+        title="Hello, Max!"
         titleRight={
-          <span aria-hidden="true" className="shrink-0 self-center">
-            <svg viewBox="0 0 24 24" className="w-9 h-9 md:w-12 md:h-12" xmlns="http://www.w3.org/2000/svg">
+          <span aria-hidden="true" className="flex shrink-0 flex-col items-center">
+            <svg viewBox="0 0 24 24" className="robot-bounce h-9 w-9 md:h-12 md:w-12" xmlns="http://www.w3.org/2000/svg">
               <rect x="7" y="18" width="3" height="4" fill="var(--robot-dark)" />
               <rect x="14" y="18" width="3" height="4" fill="var(--robot-dark)" />
-              <rect className="arm left" x="2" y="11" width="4" height="3" fill="var(--robot)" />
-              <rect className="arm right" x="18" y="11" width="4" height="3" fill="var(--robot)" />
+              <rect x="2" y="11" width="4" height="3" fill="var(--robot)" />
+              <rect x="18" y="11" width="4" height="3" fill="var(--robot)" />
               <rect x="6" y="6" width="12" height="12" rx="1" fill="var(--robot)" />
-              <rect className="eye left" x="9" y="10" width="2" height="3" fill="var(--ink)" />
+              <rect className="eye" x="9" y="10" width="2" height="3" fill="var(--ink)" />
               <rect className="eye right" x="13" y="10" width="2" height="3" fill="var(--ink)" />
             </svg>
+            <span className="robot-bounce-shadow h-1 w-5 rounded-full md:h-1.5 md:w-7" />
           </span>
         }
         subtitle={

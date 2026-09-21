@@ -18,7 +18,7 @@ export function PageHeader({ title, subtitle, actions, titleRight, titleClassNam
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-[14rem] flex-1">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
           <h1 className={titleClassName}>{title}</h1>
           {titleRight}
         </div>
