@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import {
-  Broom, CaretRight, ClipboardText, DoorOpen, DotsThreeOutline, Drop, HandCoins, Lightning,
-  Package, Receipt, SprayBottle, Toolbox, UserGear, WifiHigh, Wrench,
+  Broom, CaretRight, ClipboardText, DotsThreeOutline, Drop, HandCoins, Lightning,
+  Receipt, SprayBottle, Toolbox, UserGear, WifiHigh, Wrench,
 } from "@phosphor-icons/react/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
@@ -113,18 +113,18 @@ const RING_STROKE: Record<Pastel, string> = {
   peri: "var(--color-peri)",
 };
 
-export const OCCUPANCY_SEGMENTS = {
-  occupied: { label: "Occupied", tone: "mint" as Pastel, icon: DoorOpen },
-  vacant: { label: "Vacant", tone: "peri" as Pastel, icon: Package },
-  damaged: { label: "Damaged", tone: "butter" as Pastel, icon: Wrench },
+export const CASHFLOW_SEGMENTS = {
+  income: { label: "Income", tone: "mint" as Pastel, icon: HandCoins },
+  expenses: { label: "Expenses", tone: "blush" as Pastel, icon: Receipt },
 };
 
 // Thick rounded-cap ring, one arc per room status, sized by room count (brief 6.5).
-export function SegmentedRing({ segments, center, caption, size = 200 }: {
-  segments: { key: string; value: number; label: string; tone: Pastel; icon: Icon }[];
+export function SegmentedRing({ segments, center, caption, size = 200, centerClassName = "text-4xl" }: {
+  segments: { key: string; value: number; label: string; tone: Pastel; icon: Icon; display?: string }[];
   center: string;
   caption: string;
   size?: number;
+  centerClassName?: string;
 }) {
   const stroke = Math.round(size * 0.12);
   const r = (size - stroke) / 2 - 2;
@@ -147,7 +147,7 @@ export function SegmentedRing({ segments, center, caption, size = 200 }: {
     const len = lens[i];
     return { ...s, start, len, visible: Math.max(single ? len : len - gap, 0.5) };
   });
-  const summary = segments.map((s) => `${s.value} ${s.label.toLowerCase()}`).join(", ");
+  const summary = segments.map((s) => `${s.display ?? s.value} ${s.label.toLowerCase()}`).join(", ");
 
   return (
     <div className="relative mx-auto" style={{ width: size, height: size }} role="img" aria-label={`${center} ${caption}: ${summary}`}>
@@ -172,7 +172,7 @@ export function SegmentedRing({ segments, center, caption, size = 200 }: {
         );
       })}
       <div className="absolute inset-0 grid place-content-center text-center" aria-hidden>
-        <span className="font-display text-4xl leading-none font-extrabold tracking-tight">{center}</span>
+        <span className={`font-display ${centerClassName} leading-none font-extrabold tracking-tight`}>{center}</span>
         <span className="mt-1 text-xs text-ink-soft">{caption}</span>
       </div>
     </div>

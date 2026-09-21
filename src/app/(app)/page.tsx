@@ -8,7 +8,7 @@ import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
 import { markRoomPaid, startPeriod, toggleTransfer } from "@/app/actions";
 import { Empty, MiniBars, PageHeader, Section, Sparkline, StatCard, StatusPill, WaButton } from "@/components/ui";
-import { AlertCallout, Avatar, Chevron, CountPill, IconBadge, ListRow, OCCUPANCY_SEGMENTS, PASTEL_BG, SegmentedRing, taskCategoryMeta } from "@/components/kit";
+import { AlertCallout, Avatar, CASHFLOW_SEGMENTS, Chevron, CountPill, IconBadge, ListRow, PASTEL_BG, SegmentedRing, taskCategoryMeta } from "@/components/kit";
 import { SubmitButton } from "@/components/forms";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
 import { RoomSearch } from "@/components/room-search";
@@ -34,17 +34,9 @@ export default async function DashboardPage() {
 
   const summary = latest ? summarize(latest) : null;
   const closings = periods.map((p) => summarize(p).closingBalance);
-  const occupied = rooms.filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK").length;
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
   const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
   const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
-  const counts = {
-    lunas: rooms.filter((r) => r.status === "LUNAS").length,
-    tahunan: rooms.filter((r) => r.status === "TAHUNAN").length,
-    kosong: rooms.filter((r) => r.status === "KOSONG").length,
-    rusak: rooms.filter((r) => r.status === "RUSAK").length,
-  };
-
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const startOfTodayForOverdue = now;
   const endingLeases = rooms
@@ -167,20 +159,20 @@ export default async function DashboardPage() {
             footer={<span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-[#F6F1E5]"}`}>
               {summary.netFlow >= 0 ? "+" : ""}{rupiahShort(summary.netFlow)} this month
             </span>} />
-          <section className="card flex flex-col items-center gap-3 bg-white sm:row-span-2 xl:row-span-1" aria-labelledby="occupancy-title">
-            <h2 id="occupancy-title" className="self-start text-xs font-semibold tracking-wide text-ink-soft uppercase">Rooms occupied</h2>
-            <SegmentedRing size={168} center={`${Math.round((occupied / Math.max(rooms.length, 1)) * 100)}%`}
-              caption={`${occupied} of ${rooms.length} rooms`}
+          <section className="card flex flex-col items-center gap-3 bg-white sm:row-span-2 xl:row-span-1" aria-labelledby="cashflow-title">
+            <h2 id="cashflow-title" className="self-start text-xs font-semibold tracking-wide text-ink-soft uppercase">Net cash flow</h2>
+            <SegmentedRing size={168} centerClassName="text-xl"
+              center={`${summary.netFlow >= 0 ? "+" : ""}${rupiahShort(summary.netFlow)}`}
+              caption={label}
               segments={[
-                { key: "occupied", value: occupied, ...OCCUPANCY_SEGMENTS.occupied },
-                { key: "vacant", value: counts.kosong, ...OCCUPANCY_SEGMENTS.vacant },
-                { key: "damaged", value: counts.rusak, ...OCCUPANCY_SEGMENTS.damaged },
+                { key: "income", value: summary.incomeTotal, display: rupiahShort(summary.incomeTotal), ...CASHFLOW_SEGMENTS.income },
+                { key: "expenses", value: summary.expenseTotal, display: rupiahShort(summary.expenseTotal), ...CASHFLOW_SEGMENTS.expenses },
               ]} />
             <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs">
-              {([["occupied", occupied], ["vacant", counts.kosong], ["damaged", counts.rusak]] as const).map(([k, n]) => (
+              {([["income", summary.incomeTotal], ["expenses", summary.expenseTotal]] as const).map(([k, n]) => (
                 <li key={k} className="flex items-center gap-1.5">
-                  <span className={`h-2.5 w-2.5 rounded-full ${PASTEL_BG[OCCUPANCY_SEGMENTS[k].tone]}`} aria-hidden />
-                  <span className="num font-semibold">{n}</span> {OCCUPANCY_SEGMENTS[k].label.toLowerCase()}
+                  <span className={`h-2.5 w-2.5 rounded-full ${PASTEL_BG[CASHFLOW_SEGMENTS[k].tone]}`} aria-hidden />
+                  <span className="num font-semibold">{rupiahShort(n)}</span> {CASHFLOW_SEGMENTS[k].label.toLowerCase()}
                 </li>
               ))}
             </ul>
