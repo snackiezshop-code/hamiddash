@@ -18,7 +18,7 @@ export type QuickAddData = {
 type Kind = "menu" | "payment" | "tenant" | "expense" | "task";
 type Preset = { roomId?: string; periodId?: string; periodLabel?: string };
 
-const Ctx = createContext<{ open: (kind: Kind, preset?: Preset) => void } | null>(null);
+const Ctx = createContext<{ open: (kind: Kind, preset?: Preset) => void; isOpen: boolean } | null>(null);
 
 export function useQuickAdd() {
   const ctx = useContext(Ctx);
@@ -61,7 +61,7 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
   const expensePeriodLabel = preset.periodLabel ?? data.period?.label;
 
   return (
-    <Ctx.Provider value={{ open }}>
+    <Ctx.Provider value={{ open, isOpen: kind !== null }}>
       {children}
 
       <Sheet open={kind === "menu"} onClose={close} title="Quick add">
@@ -69,7 +69,7 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
           {actions.map((a) => (
             <li key={a.kind}>
               <button type="button" onClick={() => open(a.kind)}
-                className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-3xl bg-white px-4 py-2.5 text-left hover:bg-cream-2">
+                className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-3xl bg-white px-4 py-2.5 text-left transition-transform duration-[120ms] hover:bg-cream-2 active:scale-[0.97]">
                 <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink ${a.tone}`} aria-hidden>
                   <a.icon size={20} weight="duotone" />
                 </span>

@@ -10,6 +10,8 @@
   --color-mint: #cfe8d2;
   --color-mint-deep: #2e6b45;
   --color-terra: #C96A52;
+  /* Terracotta behind text: #F6F1E5 on it is 4.98:1 (AA). Plain terra (3.1:1 with cream) is for text-free fills only. */
+  --color-terra-strong: #A34F3B;
   --color-blush: #C96A52;
   /* Deep tones are the text colour on their pastel: blush-deep 4.96:1, butter-deep 5.02:1 (WCAG AA,
      13px pill text counts as normal text). Pastel backgrounds are unchanged. */
@@ -19,9 +21,8 @@
   --color-peri: #cdd6f3;
   --color-peri-deep: #34428c;
 
-  /* Mobile refresh accents (sampled from the reference): sage info bar, FAB pink, inline emphasis red.
+  /* Mobile refresh accents (sampled from the reference): FAB pink, inline emphasis red.
      Flag is darker than the brief's #E15241 so large text on blush clears WCAG AA (3.58:1). */
-  --color-sage: #a0b06c;
   --color-fab: #f5badc;
   --color-flag: #c43a26;
   /* Off-state switch track: 3.4:1 against its white knob, 3:1 against cream. */
@@ -119,6 +120,42 @@ body {
 /* The global 0.01ms rule would make an infinite loop flicker, so stop it outright. */
 @media (prefers-reduced-motion: reduce) {
   .robot-bounce, .robot-bounce rect.eye, .robot-bounce-shadow { animation: none !important; }
+}
+
+/* Tap the greeting robot: one-off reactions, cycled per tap. */
+.robot-react-spin { animation: robot-spin 600ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.robot-react-hop { animation: robot-hop 600ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.robot-react-love { animation: robot-love 600ms ease-out; }
+@keyframes robot-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes robot-hop { 0%, 100% { transform: translateY(0) scale(1); } 20% { transform: translateY(8%) scale(1.1, 0.85); } 50% { transform: translateY(-55%) scale(0.95, 1.08); } }
+@keyframes robot-love { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.25); } 60% { transform: scale(0.95); } }
+
+/* All-paid robot: jumps twice then rests, right arm waving throughout. */
+.robot-cheer { animation: robot-cheer 2.4s ease-in-out infinite; transform-origin: bottom center; }
+.robot-cheer rect.arm.right { transform-box: fill-box; transform-origin: 0% 50%; animation: robot-wave 1.5s ease-in-out infinite; }
+.robot-cheer rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 2.6s ease-in-out infinite; }
+@keyframes robot-cheer { 0%, 40%, 100% { transform: translateY(0); } 10%, 30% { transform: translateY(-18%); } 20% { transform: translateY(0) scale(1.06, 0.94); } }
+.sparkle { animation: sparkle 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.sparkle.late { animation-delay: 0.6s; }
+.sparkle.later { animation-delay: 1.2s; }
+@keyframes sparkle { 0%, 100% { transform: scale(0.4); opacity: 0.3; } 50% { transform: scale(1); opacity: 1; } }
+
+/* Mark-paid: coins pop out of the check button, the check draws itself in. */
+.coin { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 9999px;
+  animation: coin-pop 600ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+@keyframes coin-pop {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; }
+}
+.check-draw path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: check-draw 300ms ease-out 80ms forwards; }
+@keyframes check-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .robot-cheer, .robot-cheer rect.arm, .robot-cheer rect.eye, .sparkle,
+  .robot-react-spin, .robot-react-hop, .robot-react-love, .coin { animation: none !important; }
+  .coin { display: none; }
+  .check-draw path { animation: none !important; stroke-dashoffset: 0; }
 }
 
 /* Sheets (native <dialog>) slide up on phones and fade in from md up, on open only: closing

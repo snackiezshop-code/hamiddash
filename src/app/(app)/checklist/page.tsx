@@ -83,7 +83,7 @@ export default async function ChecklistPage({ searchParams }: PageProps<"/checkl
                           <form action={deleteChecklistItem}>
                             <input type="hidden" name="id" value={item.id} />
                             <ConfirmButton message={`Delete task "${item.title}"?`} aria-label={`Delete task ${item.title}`}
-                              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
+                              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-terra-strong hover:text-[#F6F1E5]">
                               <IconTrash width={18} height={18} />
                             </ConfirmButton>
                           </form>

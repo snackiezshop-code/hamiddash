@@ -126,7 +126,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
         <StatCard tone="blush" icon={<IconAlert />} label="Expenses" value={rupiah(s.expenseTotal)}
           footer={`${period.expenses.length} ${period.expenses.length === 1 ? "transaction" : "transactions"}`} />
         <StatCard tone="ink" icon={<IconWallet />} label="Closing balance" value={rupiah(s.closingBalance)}
-          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-[#F6F1E5]"}`}>
+          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-terra-strong text-[#F6F1E5]"}`}>
             Net cash flow {s.netFlow >= 0 ? "+" : ""}{rupiah(s.netFlow)}
           </span>} />
       </div>
@@ -195,7 +195,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                             <form action={deleteExpense}>
                               <input type="hidden" name="id" value={e.id} />
                               <ConfirmButton message={`Delete expense "${title}"?`} aria-label={`Delete expense ${title}`}
-                                className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
+                                className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-terra-strong hover:text-[#F6F1E5]">
                                 <IconTrash width={18} height={18} />
                               </ConfirmButton>
                             </form>
@@ -248,7 +248,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                     <form action={deleteAdditionalIncome}>
                       <input type="hidden" name="id" value={a.id} />
                       <ConfirmButton message={`Delete "${a.description}"?`} aria-label={`Delete ${a.description}`}
-                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
+                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-terra-strong hover:text-[#F6F1E5]">
                         <IconTrash width={18} height={18} />
                       </ConfirmButton>
                     </form>

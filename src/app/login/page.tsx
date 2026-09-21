@@ -27,9 +27,9 @@ export default function LoginPage() {
         <form action={action} className="card w-full bg-white">
           <label htmlFor="password" className="label">Password</label>
           <input id="password" name="password" type="password" autoComplete="current-password" required autoFocus className="field" />
-          {error && <p className="pill mt-3 bg-blush text-[#F6F1E5]">{error}</p>}
+          {error && <p className="pill mt-3 bg-terra-strong text-[#F6F1E5]">{error}</p>}
           <button type="submit" disabled={pending}
-            className="btn mt-4 w-full bg-[#C96A52] text-[#F6F1E5] transition-colors hover:bg-[#A6543F] disabled:opacity-50">
+            className="btn mt-4 w-full bg-terra-strong text-[#F6F1E5] transition-colors hover:bg-[#8C4332] disabled:opacity-50">
             {pending ? "Checking…" : "Log in"}
           </button>
         </form>

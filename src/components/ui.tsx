@@ -46,7 +46,7 @@ export function StatCard({ tone, icon, label, value, footer, chart }: {
         {chart}
       </div>
       <div className="mt-auto pt-4">
-        <div className={`text-xs font-semibold tracking-wide uppercase ${tone === "ink" ? "opacity-75" : ""}`}>{label}</div>
+        <div className={`text-xs font-semibold ${tone === "ink" ? "opacity-75" : ""}`}>{label}</div>
         <div className="num mt-1 text-2xl font-semibold tracking-tight break-words md:text-3xl">{value}</div>
         {footer && <div className="mt-2 text-xs">{footer}</div>}
       </div>
@@ -111,16 +111,5 @@ export function Sparkline({ values, width = 96, height = 40 }: { values: number[
       <path d={d} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={lx} cy={ly} r={3.5} fill="currentColor" />
     </svg>
-  );
-}
-
-export function MiniBars({ parts }: { parts: { value: number; className: string }[] }) {
-  const total = parts.reduce((s, p) => s + p.value, 0) || 1;
-  return (
-    <div className="flex h-2.5 w-24 overflow-hidden rounded-full bg-white/60" aria-hidden>
-      {parts.map((p, i) => (
-        <div key={i} className={p.className} style={{ width: `${(p.value / total) * 100}%` }} />
-      ))}
-    </div>
   );
 }

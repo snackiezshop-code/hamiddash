@@ -99,16 +99,16 @@ export function Sidebar({ reminders, cashHref }: { reminders: ReminderEntry[]; c
 
 export function BottomBar({ cashHref }: { cashHref: string }) {
   const { isOn, onTap } = useNavHighlight();
-  const { open } = useQuickAdd();
+  const { open, isOpen } = useQuickAdd();
   const items = mainItems(cashHref);
   const tab = ({ href, to, label, icon: Icon }: (typeof items)[number]) => {
     const active = isOn(href);
     return (
       <Link key={href} href={to} onClick={onTap(href)} aria-current={active ? "page" : undefined}
-        className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] leading-3 font-semibold transition-colors duration-200 ${
+        className={`flex h-14 min-w-12 shrink-0 flex-col min-[360px]:min-w-14 items-center justify-center gap-0.5 rounded-full px-1 text-[12px] leading-4 font-semibold transition-[background-color,color,transform] duration-200 active:scale-95 ${
           active ? "bg-cream text-ink" : "text-cream/75"
         }`}>
-        {/* Active tab: a 56px circle shade holding icon + label ("Checklist" is the widest fit), icon in its own small circle. */}
+        {/* Active tab: a 56px-tall pill shade holding icon + label (widens for "Checklist" at 12px), icon in its own small circle. */}
         <span className={`grid h-5 w-5 place-items-center rounded-full transition-colors duration-200 ${active ? "bg-cream-2" : ""}`}>
           <Icon width={16} height={16} />
         </span>
@@ -123,8 +123,9 @@ export function BottomBar({ cashHref }: { cashHref: string }) {
       <div className="flex flex-1 justify-around">{items.slice(0, 2).map(tab)}</div>
       <div className="relative w-14 shrink-0 self-stretch">
         <button type="button" onClick={() => open("menu")} aria-label="Quick add" aria-haspopup="dialog"
-          className="absolute -top-[34px] left-1/2 grid h-14 w-14 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-[#C96A52] text-[#F6F1E5] transition-transform active:scale-95">
-          <Plus size={24} weight="bold" aria-hidden />
+          className="absolute -top-[34px] left-1/2 grid h-14 w-14 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-terra text-[#F6F1E5] transition-transform duration-[120ms] active:scale-90">
+          {/* Turns into an × while any quick-add sheet is open. */}
+          <Plus size={24} weight="bold" aria-hidden className={`transition-transform duration-200 ${isOpen ? "rotate-45" : ""}`} />
         </button>
       </div>
       <div className="flex flex-1 justify-around">{items.slice(2).map(tab)}</div>

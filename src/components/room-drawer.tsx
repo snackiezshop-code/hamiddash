@@ -97,7 +97,7 @@ function RoomsMobileRows({ rooms }: { rooms: DrawerRoom[] }) {
 function DataPoint({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold tracking-wide text-ink-soft uppercase">{label}</dt>
+      <dt className="text-xs font-semibold text-ink-soft">{label}</dt>
       <dd className="truncate text-sm font-bold">{children}</dd>
     </div>
   );
@@ -131,23 +131,24 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
           </div>
 
           <dl className="grid grid-cols-3 gap-3">
-            <DataPoint label="Room">{room.number}</DataPoint>
+            <DataPoint label="Rent / month"><span className="num">{rupiah(room.monthlyRent)}</span></DataPoint>
             <DataPoint label="Status">{STATUS_LABEL[room.status]}</DataPoint>
-            <DataPoint label={t ? "Due day" : "Rent"}>
-              <span className="num">{t ? (t.reminderDay ? `Day ${t.reminderDay}` : "Not set") : rupiah(room.monthlyRent)}</span>
-            </DataPoint>
+            {t ? (
+              <DataPoint label="Due day"><span className="num">{t.reminderDay ? `Day ${t.reminderDay}` : "Not set"}</span></DataPoint>
+            ) : (
+              <DataPoint label="Room">{room.number}</DataPoint>
+            )}
           </dl>
 
           {t ? (
             <>
-              <dl className="flex items-center justify-between gap-3 rounded-full bg-sage px-5 py-3 text-sm">
+              <dl className="flex items-center justify-between gap-3 rounded-full bg-white px-5 py-3 text-sm">
                 <div className="min-w-0"><dt className="sr-only">Moved in</dt><dd className="truncate font-semibold">{t.moveInDate ? <>Since <span className="num">{formatDate(t.moveInDate)}</span></> : "Move-in not set"}</dd></div>
                 <div className="min-w-0 text-right"><dt className="sr-only">Lease ends</dt><dd className="truncate font-semibold">{t.leaseEndDate ? <>Until <span className="num">{formatDate(t.leaseEndDate)}</span></> : "No end date"}</dd></div>
               </dl>
 
               <div className="flex flex-wrap gap-2">
                 <WaButton phone={t.phone} label={`Chat ${t.name}`} />
-                <span className="pill num min-h-11 bg-white px-4">{rupiah(room.monthlyRent)} / month</span>
               </div>
 
               {t.notes && <p className="rounded-3xl bg-white px-4 py-3 text-sm break-words whitespace-pre-line">{t.notes}</p>}

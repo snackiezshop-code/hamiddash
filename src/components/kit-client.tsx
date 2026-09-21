@@ -8,13 +8,14 @@ import { CaretDown, Check, X } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import { errorDetails, reportClientIssue } from "@/lib/client-log";
 
-// Dashed ring = secondary (close/back), solid ink = primary (confirm/add) (brief 6.11).
-export function HeaderButton({ variant, className = "", children, ...rest }: ComponentProps<"button"> & { variant: "dashed" | "solid" }) {
+// Soft tint = secondary (close/back), solid ink = primary (confirm/add). Dashed outlines are
+// reserved for "pending / not yet" (unchecked tasks, future transfer turns).
+export function HeaderButton({ variant, className = "", children, ...rest }: ComponentProps<"button"> & { variant: "soft" | "solid" }) {
   return (
     <button type="button" {...rest}
       className={`grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full transition-colors disabled:opacity-50 ${
-        variant === "dashed"
-          ? "border-2 border-dashed border-ink/40 text-ink hover:border-ink"
+        variant === "soft"
+          ? "bg-ink/[0.07] text-ink hover:bg-ink/15"
           : "bg-ink text-cream hover:bg-ink/85"
       } ${className}`}>
       {children}
@@ -89,7 +90,7 @@ export function Sheet({ open, onClose, title, children, headerRight }: {
 function SheetHeader({ titleId, title, onClose, right }: { titleId: string; title: string; onClose: () => void; right?: ReactNode }) {
   return (
     <div className="mb-4 flex items-center gap-3">
-      <HeaderButton variant="dashed" onClick={onClose} aria-label="Close">
+      <HeaderButton variant="soft" onClick={onClose} aria-label="Close">
         <X size={18} weight="bold" aria-hidden />
       </HeaderButton>
       <h2 id={titleId} className="min-w-0 flex-1 truncate text-center font-display text-lg font-bold">{title}</h2>
@@ -133,7 +134,7 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
           <SheetHeader titleId={titleId} title={title} onClose={onClose} right={canSubmit ? <SubmitCircle label={submitLabel} /> : undefined} />
           <div className="flex flex-col gap-4">{children}</div>
-          {error && <p role="alert" className="mt-4 rounded-2xl bg-blush px-4 py-3 text-sm font-semibold text-[#F6F1E5]">{error}</p>}
+          {error && <p role="alert" className="mt-4 rounded-2xl bg-terra-strong px-4 py-3 text-sm font-semibold text-[#F6F1E5]">{error}</p>}
           {canSubmit && <SubmitWide label={submitLabel} />}
         </form>
       )}
