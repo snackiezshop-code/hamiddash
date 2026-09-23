@@ -154,7 +154,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                     <div className="flex w-full items-center justify-end gap-2 pl-[52px] sm:w-auto sm:pl-0">
                       {inc.status === "TUNDA_BAYAR" && (
                         <WaButton iconOnly phone={tenant?.phone} label={`Remind ${tenant?.name ?? "tenant"} on WhatsApp`}
-                          text={reminderText(tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, year, month)} />
+                          text={reminderText({ name: tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year, month, dueDay: tenant?.reminderDay ?? null })} />
                       )}
                       <label className="flex min-h-11 flex-1 items-center rounded-full bg-cream-2 px-4 focus-within:ring-2 focus-within:ring-ink sm:flex-none">
                         <span className="mr-1 text-xs text-ink-soft">Rp</span>

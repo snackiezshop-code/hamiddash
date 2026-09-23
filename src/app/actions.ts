@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { SESSION_COOKIE, SESSION_DAYS, createToken, timingSafeEqual } from "@/lib/session";
 import { createPeriod, isLatestPeriod, recarryBalances } from "@/lib/cashbook";
+import { sendPushToAll } from "@/lib/push";
+import { dueReminders } from "@/lib/reminders";
 import { CATEGORY_OPTIONS, STATUS_OPTIONS, isFuturePeriod, parseAmount, periodSlug } from "@/lib/format";
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
 
@@ -298,5 +300,31 @@ async function ensureTransferCheck(recipientId: string) {
     where: { periodId_recipientId: { periodId: latest.id, recipientId } },
     create: { periodId: latest.id, recipientId },
     update: {},
+  });
+}
+
+// ---------- Reminder push alerts ----------
+
+export async function subscribePush(sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+  await requireAdmin();
+  if (!sub?.endpoint?.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) throw new Error("Invalid subscription");
+  const data = { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth };
+  await db.pushSubscription.upsert({ where: { endpoint: sub.endpoint }, create: data, update: data });
+}
+
+export async function unsubscribePush(endpoint: string) {
+  await requireAdmin();
+  await db.pushSubscription.deleteMany({ where: { endpoint } });
+}
+
+export async function sendTestPush() {
+  await requireAdmin();
+  const due = await dueReminders();
+  return sendPushToAll({
+    title: "Reminder alerts are on",
+    body: due.length
+      ? `${due.length} reminder${due.length > 1 ? "s" : ""} due right now. Tap to open them.`
+      : "You'll get an alert here at 09:00 when rent is due in 3 days, due today, or overdue.",
+    url: "/pengingat",
   });
 }

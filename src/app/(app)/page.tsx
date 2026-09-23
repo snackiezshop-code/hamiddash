@@ -6,6 +6,7 @@ import {
 } from "@/lib/format";
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
+import { dueReminders } from "@/lib/reminders";
 import { startPeriod, toggleTransfer } from "@/app/actions";
 import { Empty, PageHeader, Section, Sparkline, WaButton } from "@/components/ui";
 import { Avatar, Chevron, CountPill, IconBadge, ListRow, taskCategoryMeta } from "@/components/kit";
@@ -20,7 +21,7 @@ import { IconCalendar, IconCheck, IconSettings } from "@/components/icons";
 
 export default async function DashboardPage() {
   const now = todayJakarta();
-  const [latest, rooms, periods, openTasks] = await Promise.all([
+  const [latest, rooms, periods, openTasks, reminders] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
     db.cashPeriod.findMany({
@@ -28,7 +29,9 @@ export default async function DashboardPage() {
       include: { roomIncomes: true, additionalIncomes: true, expenses: true },
     }),
     db.checklistItem.findMany({ where: { isDone: false }, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], take: 5 }),
+    dueReminders(now),
   ]);
+  const overdueCount = reminders.filter((r) => r.daysUntilDue < 0).length;
 
   const curYear = now.getUTCFullYear();
   const curMonth = now.getUTCMonth() + 1;
@@ -73,9 +76,15 @@ export default async function DashboardPage() {
       detail: "This month's cash book hasn't been created yet",
       href: "/",
     }] : []),
+    ...(overdueCount ? [{
+      id: "overdue", tone: "blush" as const,
+      title: `${overdueCount} tenant${overdueCount > 1 ? "s" : ""} past the due date`,
+      detail: "Open reminders to send the overdue WhatsApp messages",
+      href: "/pengingat",
+    }] : []),
     // Opens the pre-filled WhatsApp reminder itself; without a usable number it falls back to the room.
     ...dueToday.map((inc) => {
-      const wa = waLink(inc.room.tenant?.phone, reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest!.year, latest!.month));
+      const wa = waLink(inc.room.tenant?.phone, reminderText({ name: inc.room.tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year: latest!.year, month: latest!.month, dueDay: inc.room.tenant?.reminderDay ?? null }, now));
       return {
         id: `due-${inc.id}`, tone: "butter" as const,
         title: `Send reminder · Room ${inc.room.number}`,
@@ -173,7 +182,7 @@ export default async function DashboardPage() {
                         trailing={
                           <div className="flex shrink-0 gap-2">
                             <WaButton iconOnly phone={inc.room.tenant?.phone} label={`Remind ${inc.room.tenant?.name ?? "tenant"} on WhatsApp`}
-                              text={reminderText(inc.room.tenant?.name ?? "", inc.room.number, inc.room.monthlyRent, latest.year, latest.month)} />
+                              text={reminderText({ name: inc.room.tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year: latest.year, month: latest.month, dueDay: inc.room.tenant?.reminderDay ?? null }, now)} />
                             <PaidButton incomeId={inc.id} roomNumber={inc.room.number} />
                           </div>
                         } />
