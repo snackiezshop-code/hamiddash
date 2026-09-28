@@ -1,7 +1,8 @@
 import { MONTHS, shiftMonth } from "./format";
 
 // The heirs take turns: one of them receives the transfer each month, in this order.
-// Keyed by recipient id so it survives renames. Everyone not listed (Max, BNI) is paid every month.
+// Keyed by recipient id so it survives renames. Everyone not listed (Max) is paid every month.
+// Since 2026-09-28 BSI is the only kost account, so the monthly move to BNI is switched off in Settings.
 const HEIR_TURNS = [
   "cmu4zv2zr000hgnkevt7yh8e6", // Ferriyati (Mimi): August 2026
   "cmu4zv2zr000ignkeh425bc4x", // Laili Suhairi (Bunda): September 2026

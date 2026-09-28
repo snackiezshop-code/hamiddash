@@ -2,7 +2,7 @@
 
 import type { ExpenseCategory, Repeat } from "@/generated/prisma/enums";
 import { CATEGORY_LABEL, CATEGORY_OPTIONS } from "@/lib/format";
-import { REPEAT_LABEL, REPEAT_OPTIONS } from "@/lib/reminder-items";
+import { REMIND_OPTIONS, REPEAT_LABEL, REPEAT_OPTIONS, remindLabel } from "@/lib/reminder-items";
 import { TASK_CATEGORIES } from "./kit";
 import { DuePills, Field, SelectPill } from "./kit-client";
 import { AmountInput } from "./forms";
@@ -11,14 +11,16 @@ export type ReminderDefaults = {
   title?: string;
   dueDate?: string; // yyyy-mm-dd
   repeat?: Repeat;
+  remindBefore?: number;
   amount?: number | null;
   category?: ExpenseCategory | null;
   tag?: string | null;
   roomId?: string | null;
 };
 
-// The fields behind both "Add reminder" and "Edit reminder". Only the title is required; an amount
-// turns the reminder into a bill whose Paid button records the expense.
+// The fields behind both "Add reminder" and "Edit reminder". Only the title is required. A cash book
+// category turns it into a bill: Paid records the expense, with the fixed amount if there is one,
+// or asks for the amount (bills that change every month, like electricity and water).
 export function ReminderFields({ idPrefix, rooms, defaults = {} }: {
   idPrefix: string;
   rooms: { id: string; number: number }[];
@@ -37,21 +39,28 @@ export function ReminderFields({ idPrefix, rooms, defaults = {} }: {
           <SelectPill name="repeat" ariaLabel="Repeats" defaultValue={defaults.repeat ?? "NONE"}
             options={REPEAT_OPTIONS.map((r) => ({ value: r, label: REPEAT_LABEL[r] }))} />
         </div>
-        <Field label="Amount (optional)" htmlFor={`${idPrefix}-amount`}>
+        <div>
+          <span className="label">Remind me</span>
+          <SelectPill name="remindBefore" ariaLabel="Remind me" defaultValue={String(defaults.remindBefore ?? 1)}
+            options={REMIND_OPTIONS.map((d) => ({ value: String(d), label: remindLabel(d) }))} />
+        </div>
+        <div>
+          <span className="label">Cash book category</span>
+          <SelectPill name="category" ariaLabel="Cash book category" defaultValue={defaults.category ?? ""}
+            options={[{ value: "", label: "None" }, ...CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] }))]} />
+        </div>
+        <Field label="Fixed amount" htmlFor={`${idPrefix}-amount`}>
           <AmountInput id={`${idPrefix}-amount`} name="amount" defaultValue={defaults.amount} placeholder="Rp" className="field num" />
         </Field>
       </div>
-      <p className="-mt-2 text-xs text-ink-soft">With an amount, marking it paid adds it to this month&apos;s expenses.</p>
+      <p className="-mt-2 text-xs text-ink-soft">
+        With a category it&apos;s a bill: Paid adds it to this month&apos;s expenses. Leave the amount empty if it changes every month; you&apos;ll type it in when paying.
+      </p>
       <details className="group">
         <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-ink-soft hover:text-ink">
           More options
         </summary>
         <div className="mt-2 flex flex-col gap-3">
-          <div>
-            <span className="label">Expense category</span>
-            <SelectPill name="category" ariaLabel="Expense category" defaultValue={defaults.category ?? "LAINNYA"}
-              options={CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] }))} />
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <span className="label">Type</span>

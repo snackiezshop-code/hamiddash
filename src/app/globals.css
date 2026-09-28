@@ -31,8 +31,8 @@
   --color-track: #8f8a80;
 
   --font-display: var(--font-gelasio), Georgia, serif;
-  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-sans: var(--font-vt323), ui-monospace, monospace;
+  --font-mono: var(--font-vt323), ui-monospace, monospace;
   --font-greeting: var(--font-gelasio), Georgia, serif;
 
   /* Type scale: 13 / 16 / 17 / 20 / 24 / 28 / 32 / 40 — body text never below 16px */
@@ -68,10 +68,17 @@ html {
   color-scheme: light;
 }
 
+/* VT323's lowercase letters are small for their font size, so font-size-adjust scales it to the
+   x-height a regular sans would have: the type scale stays the same and text stays readable.
+   Gelasio headings keep their own proportions. */
 body {
   background: #ffffff;
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size-adjust: 0.5;
+}
+:where(.font-display, .font-greeting, .font-splash, .h-display) {
+  font-size-adjust: none;
 }
 
 .num {

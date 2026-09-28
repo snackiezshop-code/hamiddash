@@ -12,7 +12,7 @@ import { dueReminders } from "@/lib/reminders";
 import {
   CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, todayJakarta,
 } from "@/lib/format";
-import { REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
+import { REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
 import type { ExpenseCategory, Repeat, RoomStatus } from "@/generated/prisma/enums";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -202,15 +202,24 @@ export async function deleteAdditionalIncome(form: FormData) {
   refresh();
 }
 
+// "Other" needs a typed-in name so the cash book says what the money was for.
+function expenseCategory(form: FormData) {
+  const category = str(form, "category") as ExpenseCategory;
+  if (!CATEGORY_OPTIONS.includes(category)) return { error: "Choose a category." } as const;
+  const categoryLabel = category === "LAINNYA" ? optStr(form, "categoryLabel") : null;
+  if (category === "LAINNYA" && !categoryLabel) return { error: "Type a name for the Other category." } as const;
+  return { category, categoryLabel } as const;
+}
+
 export async function addExpense(form: FormData) {
   await requireAdmin();
   const period = await periodOf(str(form, "periodId"));
-  const category = str(form, "category") as ExpenseCategory;
-  if (!CATEGORY_OPTIONS.includes(category)) return "Choose a category.";
+  const cat = expenseCategory(form);
+  if ("error" in cat) return cat.error;
   const amount = parseAmount(form.get("amount"));
   if (amount <= 0) return;
   await db.expense.create({
-    data: { periodId: period.id, category, description: str(form, "description") || "-", amount },
+    data: { periodId: period.id, ...cat, description: str(form, "description") || "-", amount },
   });
   await recarryBalances(period.year, period.month);
   refresh();
@@ -219,13 +228,13 @@ export async function addExpense(form: FormData) {
 // Returns an error message for the sheet to show, or undefined on success.
 export async function updateExpense(form: FormData) {
   await requireAdmin();
-  const category = str(form, "category") as ExpenseCategory;
-  if (!CATEGORY_OPTIONS.includes(category)) return "Choose a category.";
+  const cat = expenseCategory(form);
+  if ("error" in cat) return cat.error;
   const amount = parseAmount(form.get("amount"));
   if (amount <= 0) return "Enter an amount above 0.";
   const row = await db.expense.update({
     where: { id: str(form, "id") },
-    data: { category, description: str(form, "description") || "-", amount },
+    data: { ...cat, description: str(form, "description") || "-", amount },
     include: { period: true },
   });
   await recarryBalances(row.period.year, row.period.month);
@@ -251,18 +260,22 @@ export async function toggleTransfer(form: FormData) {
 
 // ---------- Reminders (bills, repairs, admin) ----------
 
+// A category makes the reminder a bill: Paid records the expense, using the fixed amount or,
+// when the bill changes every month (electricity, water), the amount typed in at payment.
 function reminderData(form: FormData) {
   const repeat = str(form, "repeat") as Repeat;
   const amount = parseAmount(form.get("amount"));
   const category = str(form, "category") as ExpenseCategory;
+  const remindBefore = Number(str(form, "remindBefore"));
   return {
     title: str(form, "title"),
     tag: optStr(form, "tag"),
     roomId: optStr(form, "roomId"),
     dueDate: optDate(form, "dueDate"),
     repeat: REPEAT_OPTIONS.includes(repeat) ? repeat : "NONE",
+    remindBefore: REMIND_OPTIONS.includes(remindBefore) ? remindBefore : 1,
     amount: amount > 0 ? amount : null,
-    category: amount > 0 ? (CATEGORY_OPTIONS.includes(category) ? category : "LAINNYA") : null,
+    category: CATEGORY_OPTIONS.includes(category) ? category : amount > 0 ? "LAINNYA" : null,
   } as const;
 }
 
@@ -291,20 +304,23 @@ export async function updateReminder(form: FormData) {
   refresh();
 }
 
-// Done (or Paid, for a bill). A bill records its expense in this month's cash book first; a repeating
-// reminder then moves on to its next date, a one-off one is ticked off.
+// Done (or Paid, for a bill). A bill records its expense in this month's cash book first: its fixed
+// amount, or the amount typed in when paying. A repeating reminder then moves on to its next date,
+// a one-off one is ticked off.
 export async function completeReminder(_prev: string | null | undefined, form: FormData) {
   await requireAdmin();
   const r = await db.reminder.findUniqueOrThrow({ where: { id: str(form, "id") } });
-  if (r.amount) {
+  const paid = r.amount ?? (parseAmount(form.get("amount")) || null);
+  if (paid) {
     const today = todayJakarta();
     const year = today.getUTCFullYear();
     const month = today.getUTCMonth() + 1;
     const period = await db.cashPeriod.findUnique({ where: { year_month: { year, month } } });
     if (!period) return `Start the ${periodLabel(year, month)} cash book first.`;
+    const category = r.category ?? "LAINNYA";
     await db.expense.create({
       data: {
-        periodId: period.id, category: r.category ?? "LAINNYA", amount: r.amount,
+        periodId: period.id, category, categoryLabel: category === "LAINNYA" ? r.title : null, amount: paid,
         description: r.dueDate ? `${r.title} · due ${formatDate(r.dueDate)}` : r.title,
       },
     });

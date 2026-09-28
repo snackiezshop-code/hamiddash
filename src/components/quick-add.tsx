@@ -3,10 +3,11 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { IconAlarmClock, IconBanknote, IconChevronRight, IconReceipt, IconUserPlus, type AppIcon } from "./icons";
 import { addExpense, addReminder, addTenant, updateRoomIncome } from "@/app/actions";
-import { CATEGORY_LABEL, CATEGORY_OPTIONS, rupiah } from "@/lib/format";
+import { rupiah } from "@/lib/format";
 import { Field, FormSheet, SelectPill, Sheet } from "./kit-client";
 import { AmountInput } from "./forms";
 import { ReminderFields } from "./reminder-form";
+import { ExpenseCategoryField } from "./expense-category-field";
 
 export type QuickAddData = {
   period: { id: string; label: string } | null;
@@ -136,11 +137,7 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
           <>
             <input type="hidden" name="periodId" value={expensePeriodId} />
             <p className="-mt-2 text-center text-xs text-ink-soft">Goes into the {expensePeriodLabel} cash book</p>
-            <div>
-              <span className="label">Category</span>
-              <SelectPill name="category" ariaLabel="Category" required requiredMessage="Choose a category"
-                options={CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] }))} />
-            </div>
+            <ExpenseCategoryField idPrefix="qa-exp" />
             <Field label="Description" htmlFor="qa-exp-desc">
               <input id="qa-exp-desc" name="description" placeholder="e.g. Pipe repair, Room 4" className="field" />
             </Field>

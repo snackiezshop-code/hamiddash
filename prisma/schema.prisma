@@ -24,14 +24,14 @@ enum RoomStatus {
 }
 
 model Room {
-  id            String       @id @default(cuid())
-  number        Int          @unique // Kamar 1-16
-  monthlyRent   Int // Rp per month, room-specific
-  status        RoomStatus   @default(KOSONG)
-  tenant        Tenant?
-  roomIncomes   RoomIncome[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  number      Int          @unique // Kamar 1-16
+  monthlyRent Int // Rp per month, room-specific
+  status      RoomStatus   @default(KOSONG)
+  tenant      Tenant?
+  roomIncomes RoomIncome[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Tenant {
@@ -50,31 +50,31 @@ model Tenant {
 
 // One row per calendar month — the cash-book "sheet".
 model CashPeriod {
-  id                 String              @id @default(cuid())
-  year               Int
-  month              Int // 1-12
-  openingBalance     Int // Saldo Kas Awal, carried from previous period's closing balance
-  roomIncomes        RoomIncome[]
-  additionalIncomes  AdditionalIncome[]
-  expenses           Expense[]
-  transferChecks     TransferCheck[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                String             @id @default(cuid())
+  year              Int
+  month             Int // 1-12
+  openingBalance    Int // Saldo Kas Awal, carried from previous period's closing balance
+  roomIncomes       RoomIncome[]
+  additionalIncomes AdditionalIncome[]
+  expenses          Expense[]
+  transferChecks    TransferCheck[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@unique([year, month])
 }
 
 // Pemasukan Sewa Kamar — one row per room per period.
 model RoomIncome {
-  id           String     @id @default(cuid())
-  period       CashPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  periodId     String
-  room         Room       @relation(fields: [roomId], references: [id])
-  roomId       String
-  status       RoomStatus
-  amount       Int // Nominal actually received this period (0 if kosong/unpaid)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id        String     @id @default(cuid())
+  period    CashPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId  String
+  room      Room       @relation(fields: [roomId], references: [id])
+  roomId    String
+  status    RoomStatus
+  amount    Int // Nominal actually received this period (0 if kosong/unpaid)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@unique([periodId, roomId])
 }
@@ -106,13 +106,14 @@ enum ExpenseCategory {
 }
 
 model Expense {
-  id          String          @id @default(cuid())
-  period      CashPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  periodId    String
-  category    ExpenseCategory
-  description String
-  amount      Int
-  createdAt   DateTime        @default(now())
+  id            String          @id @default(cuid())
+  period        CashPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId      String
+  category      ExpenseCategory
+  categoryLabel String? // typed-in category name when category is LAINNYA ("Other"), e.g. "PBB"
+  description   String
+  amount        Int
+  createdAt     DateTime        @default(now())
 }
 
 // Configurable list of payout recipients (caretaker, profit-share family members, bank).
@@ -163,16 +164,17 @@ enum Repeat {
 // bills like the cleaning service, repairs, admin. Marking a repeating reminder done moves dueDate on
 // by its repeat; with an amount, it also records the expense in that month's cash book.
 model Reminder {
-  id        String           @id @default(cuid())
-  title     String
-  tag       String? // Cleaning / Maintenance / Admin / Other (carried over from the old checklist)
-  roomId    String? // optional link to a specific room
-  dueDate   DateTime? // Jakarta calendar date, stored as UTC midnight
-  repeat    Repeat           @default(NONE)
-  amount    Int? // Rp; set for bills
-  category  ExpenseCategory? // cash book category for the expense a bill records
-  isDone    Boolean          @default(false) // one-off reminders only
-  doneAt    DateTime?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id           String           @id @default(cuid())
+  title        String
+  tag          String? // Cleaning / Maintenance / Admin / Other (carried over from the old checklist)
+  roomId       String? // optional link to a specific room
+  dueDate      DateTime? // Jakarta calendar date, stored as UTC midnight
+  repeat       Repeat           @default(NONE)
+  remindBefore Int              @default(1) // days before dueDate that the push alert fires (0 = on the day only)
+  amount       Int? // Rp; set for bills
+  category     ExpenseCategory? // cash book category for the expense a bill records
+  isDone       Boolean          @default(false) // one-off reminders only
+  doneAt       DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 }

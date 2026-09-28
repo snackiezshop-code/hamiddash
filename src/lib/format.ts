@@ -112,6 +112,11 @@ export const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
   LAINNYA: "Other",
 };
 
+// "Other" expenses carry a typed-in name ("PBB", "Iuran RT"); every other category uses its fixed label.
+export function expenseCategoryName(e: { category: ExpenseCategory; categoryLabel?: string | null }) {
+  return e.category === "LAINNYA" && e.categoryLabel ? e.categoryLabel : CATEGORY_LABEL[e.category];
+}
+
 // Indonesian local numbers (08xx) → wa.me international format (628xx).
 export function waNumber(phone: string | null | undefined) {
   if (!phone) return null;

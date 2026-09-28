@@ -7,8 +7,8 @@ import { dateInputValue, formatDate, rupiah } from "@/lib/format";
 import { REPEAT_LABEL, dueLabel } from "@/lib/reminder-items";
 import { errorDetails, reportClientIssue } from "@/lib/client-log";
 import { EXPENSE_META, IconBadge, taskCategoryMeta } from "./kit";
-import { Sheet } from "./kit-client";
-import { ConfirmButton, SubmitButton } from "./forms";
+import { Field, Sheet } from "./kit-client";
+import { AmountInput, ConfirmButton, SubmitButton } from "./forms";
 import { ReminderFields } from "./reminder-form";
 import { IconCheck, IconTrash, IconUndo } from "./icons";
 
@@ -21,13 +21,14 @@ export type ReminderItem = {
   dueDate: Date | null;
   daysUntilDue: number | null; // worked out on the server in Jakarta time
   repeat: Repeat;
+  remindBefore: number;
   amount: number | null;
   category: ExpenseCategory | null;
   isDone: boolean;
   doneAt: Date | null;
 };
 
-const metaOf = (r: ReminderItem) => (r.amount && r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag));
+const metaOf = (r: ReminderItem) => (r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag));
 
 function dueTone(days: number | null) {
   if (days === null) return "bg-cream text-ink-soft";
@@ -79,18 +80,68 @@ export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: {
 }
 
 // A bill says Paid (it records the expense); everything else says Done. Errors show under the button.
+// A bill without a fixed amount (electricity, water) asks for this month's amount first.
 function DoneButton({ item }: { item: ReminderItem }) {
+  const [asking, setAsking] = useState(false);
+  const isBill = Boolean(item.amount || item.category);
+  const label = isBill ? "Paid" : "Done";
+  const buttonClass = "btn btn-sm border border-line bg-white text-ink hover:bg-mint hover:text-mint-deep";
+
+  if (isBill && !item.amount) {
+    return (
+      <>
+        <button type="button" onClick={() => setAsking(true)} aria-haspopup="dialog" className={`${buttonClass} shrink-0`}
+          aria-label={`Mark "${item.title}" paid`}>
+          <IconCheck width={16} /> {label}
+        </button>
+        <PaySheet key={String(asking)} item={item} open={asking} onClose={() => setAsking(false)} />
+      </>
+    );
+  }
+  return <CompleteForm item={item} label={label} buttonClass={buttonClass} />;
+}
+
+function CompleteForm({ item, label, buttonClass }: { item: ReminderItem; label: string; buttonClass: string }) {
   const [error, action] = useActionState(completeReminder, null);
-  const label = item.amount ? "Paid" : "Done";
   return (
     <form action={action} className="flex shrink-0 flex-col items-end gap-1">
       <input type="hidden" name="id" value={item.id} />
-      <SubmitButton className="btn btn-sm border border-line bg-white text-ink hover:bg-mint hover:text-mint-deep" pendingText="Saving…"
-        aria-label={`Mark "${item.title}" ${label.toLowerCase()}`}>
-        <IconCheck width={16} height={16} strokeWidth={3} /> {label}
+      <SubmitButton className={buttonClass} pendingText="Saving…" aria-label={`Mark "${item.title}" ${label.toLowerCase()}`}>
+        <IconCheck width={16} /> {label}
       </SubmitButton>
       {error && <p role="alert" className="max-w-44 text-right text-xs font-semibold text-blush-deep">{error}</p>}
     </form>
+  );
+}
+
+function PaySheet({ item, open, onClose }: { item: ReminderItem; open: boolean; onClose: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Sheet open={open} onClose={onClose} title={`Pay ${item.title}`}>
+      <form className="flex flex-col gap-4"
+        action={async (fd) => {
+          setError(null);
+          try {
+            const res = await completeReminder(null, fd);
+            if (typeof res === "string") setError(res);
+            else onClose();
+          } catch (err) {
+            reportClientIssue("form-save-failed", { form: "Pay reminder", ...errorDetails(err) });
+            setError("Couldn't save. Check your connection and try again.");
+          }
+        }}>
+        <input type="hidden" name="id" value={item.id} />
+        <Field label="Amount paid (Rp)" htmlFor={`pay-${item.id}`}>
+          <AmountInput id={`pay-${item.id}`} name="amount" required pattern="[0-9.,\s]*[1-9][0-9.,\s]*"
+            title="Enter an amount above 0" placeholder="e.g. 385.000" className="field num" />
+        </Field>
+        <p className="-mt-2 text-xs text-ink-soft">
+          Goes into this month&apos;s expenses{item.repeat !== "NONE" ? `, then the reminder moves on to its next date` : ""}.
+        </p>
+        {error && <p role="alert" className="rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+        <SubmitButton className="btn-primary w-full" pendingText="Saving…">Save payment</SubmitButton>
+      </form>
+    </Sheet>
   );
 }
 
@@ -125,7 +176,7 @@ function ReminderSheet({ item, rooms, onClose }: { item: ReminderItem | null; ro
             }}>
             <input type="hidden" name="id" value={item.id} />
             <ReminderFields idPrefix={`rem-${item.id}`} rooms={rooms} defaults={{
-              title: item.title, dueDate: dateInputValue(item.dueDate), repeat: item.repeat,
+              title: item.title, dueDate: dateInputValue(item.dueDate), repeat: item.repeat, remindBefore: item.remindBefore,
               amount: item.amount, category: item.category, tag: item.tag, roomId: item.roomId,
             }} />
             {error && <p role="alert" className="rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}

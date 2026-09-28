@@ -30,7 +30,7 @@ export default async function RemindersPage({ searchParams }: PageProps<"/pengin
   const roomNo = new Map(rooms.map((r) => [r.id, r.number]));
   const items: ReminderItem[] = rows.map((r) => ({
     id: r.id, title: r.title, tag: r.tag, roomId: r.roomId, roomNumber: r.roomId ? roomNo.get(r.roomId) ?? null : null,
-    dueDate: r.dueDate, daysUntilDue: daysUntil(r.dueDate, today), repeat: r.repeat,
+    dueDate: r.dueDate, daysUntilDue: daysUntil(r.dueDate, today), repeat: r.repeat, remindBefore: r.remindBefore,
     amount: r.amount, category: r.category, isDone: r.isDone, doneAt: r.doneAt,
   }));
   const dueSoon = items.filter((r) => r.daysUntilDue !== null && r.daysUntilDue <= 1).length;

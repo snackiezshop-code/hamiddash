@@ -2,23 +2,25 @@
 
 import { useState } from "react";
 import type { ExpenseCategory } from "@/generated/prisma/enums";
-import { CATEGORY_LABEL, CATEGORY_OPTIONS, formatDate, rupiah } from "@/lib/format";
+import { expenseCategoryName, formatDate, rupiah } from "@/lib/format";
 import { deleteExpense, updateExpense } from "@/app/actions";
 import { errorDetails, reportClientIssue } from "@/lib/client-log";
 import { EXPENSE_META, IconBadge } from "./kit";
-import { Field, SelectPill, Sheet } from "./kit-client";
+import { Field, Sheet } from "./kit-client";
+import { ExpenseCategoryField } from "./expense-category-field";
 import { AmountInput, ConfirmButton, SubmitButton } from "./forms";
 import { IconChevronRight, IconEdit, IconTrash } from "./icons";
 
 export type ExpenseItem = {
   id: string;
   category: ExpenseCategory;
+  categoryLabel: string | null;
   description: string;
   amount: number;
   createdAt: Date;
 };
 
-const titleOf = (e: ExpenseItem) => (e.description && e.description !== "-" ? e.description : CATEGORY_LABEL[e.category]);
+const titleOf = (e: ExpenseItem) => (e.description && e.description !== "-" ? e.description : expenseCategoryName(e));
 
 // Each expense row opens a sheet with its full description; admins can edit or delete it from there.
 export function ExpenseList({ expenses, periodLabel, editable }: { expenses: ExpenseItem[]; periodLabel: string; editable: boolean }) {
@@ -39,7 +41,7 @@ export function ExpenseList({ expenses, periodLabel, editable }: { expenses: Exp
                 <IconBadge icon={meta.icon} tone={meta.tone} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{title}</span>
-                  {title !== CATEGORY_LABEL[e.category] && <span className="block truncate text-xs text-ink-soft">{CATEGORY_LABEL[e.category]}</span>}
+                  {title !== expenseCategoryName(e) && <span className="block truncate text-xs text-ink-soft">{expenseCategoryName(e)}</span>}
                 </span>
                 <span className="num shrink-0 text-sm font-semibold">{rupiah(e.amount)}</span>
                 <IconChevronRight width={16} className="shrink-0 text-ink-soft" />
@@ -74,7 +76,7 @@ function ExpenseSheet({ expense, periodLabel, editable, onClose }: {
           </div>
           <dl className="divide-y divide-line rounded-2xl bg-white px-4 text-sm">
             {[
-              ["Category", CATEGORY_LABEL[e.category]],
+              ["Category", expenseCategoryName(e)],
               ["Cash book", periodLabel],
               ["Recorded", formatDate(e.createdAt)],
             ].map(([k, v]) => (
@@ -115,11 +117,7 @@ function ExpenseSheet({ expense, periodLabel, editable, onClose }: {
             }
           }}>
           <input type="hidden" name="id" value={e.id} />
-          <div>
-            <span className="label">Category</span>
-            <SelectPill name="category" ariaLabel="Category" defaultValue={e.category}
-              options={CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] }))} />
-          </div>
+          <ExpenseCategoryField idPrefix="exp-edit" defaultCategory={e.category} defaultLabel={e.categoryLabel} />
           <Field label="Description" htmlFor="exp-edit-desc">
             <input id="exp-edit-desc" name="description" defaultValue={e.description === "-" ? "" : e.description} className="field" />
           </Field>

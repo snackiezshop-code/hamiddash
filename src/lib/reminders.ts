@@ -1,7 +1,6 @@
 import "server-only";
 import { db } from "./db";
 import { daysBetween, dueDateOf, reminderText, shiftMonth, todayJakarta, waLink } from "./format";
-import { ALERT_DAYS_BEFORE } from "./reminder-items";
 
 // Days before the due date that a reminder is flagged: 3 days ahead, then on the day itself.
 export const REMINDER_OFFSETS = [3, 0] as const;
@@ -90,16 +89,17 @@ export type DueItem = {
   alertToday: boolean; // include in today's push alert
 };
 
-// Open reminders due within 3 days or already late, most overdue first. Undated ones never alert.
+// Open reminders due within 3 days (or their own alert lead time, if longer) or already late,
+// most overdue first. Undated ones never alert.
 export async function dueItems(today: Date = todayJakarta()): Promise<DueItem[]> {
   const rows = await db.reminder.findMany({ where: { isDone: false, dueDate: { not: null } }, orderBy: { dueDate: "asc" } });
   return rows
+    .filter((r) => daysBetween(today, r.dueDate!) <= Math.max(REMINDER_OFFSETS[0], r.remindBefore))
     .map((r) => {
       const days = daysBetween(today, r.dueDate!);
       return {
         id: r.id, title: r.title, amount: r.amount, dueDate: r.dueDate!, daysUntilDue: days,
-        alertToday: ALERT_DAYS_BEFORE.includes(days) || isOverdueAlertDay(-days),
+        alertToday: days === r.remindBefore || days === 0 || isOverdueAlertDay(-days),
       };
-    })
-    .filter((r) => r.daysUntilDue <= REMINDER_OFFSETS[0]);
+    });
 }

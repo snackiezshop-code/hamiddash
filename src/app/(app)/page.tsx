@@ -51,6 +51,7 @@ export default async function DashboardPage() {
   const label = latest ? periodLabel(latest.year, latest.month) : "";
   // Only Max, BNI and this month's heir are due; the other heirs are shown faded with their month.
   const transfers = (latest?.transferChecks ?? [])
+    .filter((t) => t.recipient.isActive || t.isSent)
     .map((t) => ({ t, due: transferDue(t.recipientId, latest!.year, latest!.month) }))
     .sort((a, b) => dueOrder(a.due) - dueOrder(b.due));
   const transfersDue = transfers.filter((x) => isDue(x.due));
@@ -329,7 +330,7 @@ export default async function DashboardPage() {
             {upcoming.length === 0 ? <Empty>Nothing coming up. Add a reminder from the menu.</Empty> : (
               <ul className="divide-y divide-line">
                 {upcoming.map((r) => {
-                  const meta = r.amount && r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag);
+                  const meta = r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag);
                   const days = daysUntil(r.dueDate, now);
                   return (
                     <li key={r.id}>

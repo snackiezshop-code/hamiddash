@@ -14,9 +14,15 @@ export const REPEAT_LABEL: Record<Repeat, string> = {
   YEARLY: "Every year",
 };
 
-// Push alerts fire the day before and on the day; once late, the day after and then every 3 days
-// (the same overdue rhythm as rent, see isOverdueAlertDay in reminders.ts).
-export const ALERT_DAYS_BEFORE = [1, 0];
+// Each reminder picks how many days ahead its push alert fires (remindBefore); it also fires on the
+// day, and once late, the day after and then every 3 days (the rent rhythm, isOverdueAlertDay).
+export const REMIND_OPTIONS = [0, 1, 2, 3, 7];
+
+export function remindLabel(days: number) {
+  if (days === 0) return "On the day";
+  if (days === 7) return "1 week before";
+  return `${days} day${days > 1 ? "s" : ""} before`;
+}
 
 // The next due date after `due` for a repeating reminder. Monthly and yearly keep the day of the
 // month where they can and clamp to short months (31 Jan → 28 Feb).
