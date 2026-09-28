@@ -1,31 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #F0EBE2;
-  --color-cream-2: #E5DDD1;
-  --color-ink: #17140f;
-  --color-ink-soft: #5c554a;
-  --color-line: #e2d9c4;
+  /* White and calm (2026-09-28 refresh): white page, warm off-white fills, hairline borders.
+     One accent: muted terracotta (the robot's colour), kept for primary actions and the mascot.
+     Every text pairing below is checked for WCAG AA. */
+  --color-cream: #F7F4F0; /* subtle fill: inputs, sheets, totals rows (ink-soft on it 5.38:1) */
+  --color-cream-2: #EEE9E2; /* hover / pressed fill */
+  --color-ink: #211D19;
+  --color-ink-soft: #6B635A;
+  --color-line: #E8E2D9;
 
-  --color-mint: #cfe8d2;
-  --color-mint-deep: #2e6b45;
-  --color-terra: #C96A52;
-  /* Terracotta behind text: #F6F1E5 on it is 4.98:1 (AA). Plain terra (3.1:1 with cream) is for text-free fills only. */
-  --color-terra-strong: #A34F3B;
-  --color-blush: #C96A52;
-  /* Deep tones are the text colour on their pastel: blush-deep 4.96:1, butter-deep 5.02:1 (WCAG AA,
-     13px pill text counts as normal text). Pastel backgrounds are unchanged. */
-  --color-blush-deep: #983527;
-  --color-butter: #f6de93;
-  --color-butter-deep: #745810;
-  --color-peri: #cdd6f3;
-  --color-peri-deep: #34428c;
+  /* Accent. terra-strong carries white text (5.53:1) and reads as text on white (5.53:1).
+     Plain terra is for text-free fills only (bars, the mascot). */
+  --color-terra: #C27A62;
+  --color-terra-strong: #A0533D;
 
-  /* Mobile refresh accents (sampled from the reference): FAB pink, inline emphasis red.
-     Flag is darker than the brief's #E15241 so large text on blush clears WCAG AA (3.58:1). */
-  --color-fab: #f5badc;
+  /* Status tints, soft enough that only what needs attention stands out. Each "deep" tone is
+     the text colour on its tint: blush 6.22:1, mint 5.87:1, butter 6.3:1, peri 7.52:1. */
+  --color-blush: #F6E6DF;
+  --color-blush-deep: #8E3A26;
+  --color-mint: #E4EFE6;
+  --color-mint-deep: #2F6446;
+  --color-butter: #F5ECD2;
+  --color-butter-deep: #6A5212;
+  --color-peri: #E7EAF3;
+  --color-peri-deep: #3A4677;
+
   --color-flag: #c43a26;
-  /* Off-state switch track: 3.4:1 against its white knob, 3:1 against cream. */
+  /* Off-state switch track: 3.4:1 against its white knob. */
   --color-track: #8f8a80;
 
   --font-display: var(--font-gelasio), Georgia, serif;
@@ -56,10 +58,10 @@
 
 :root {
   /* Splash-page robot colors */
-  --robot: #C96A52;
-  --robot-dark: #A6543F;
+  --robot: #C27A62;
+  --robot-dark: #A0533D;
   /* Bare --ink alias used by the robot SVG fill */
-  --ink: #17140f;
+  --ink: #211D19;
 }
 
 html {
@@ -67,7 +69,7 @@ html {
 }
 
 body {
-  background: var(--color-cream);
+  background: #ffffff;
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
@@ -120,6 +122,17 @@ body {
 /* The global 0.01ms rule would make an infinite loop flicker, so stop it outright. */
 @media (prefers-reduced-motion: reduce) {
   .robot-bounce, .robot-bounce rect.eye, .robot-bounce-shadow { animation: none !important; }
+}
+
+/* Greeting robot sitting on the "M" of Max: legs swing out of step, eyes blink. Asked for by the
+   owner as the dashboard's mascot moment; it is the only looping motion inside the app. */
+.robot-sit rect.leg { transform-box: fill-box; transform-origin: 50% 0%; animation: leg-swing 2.4s ease-in-out infinite; }
+.robot-sit rect.leg.right { animation-delay: -1.2s; }
+.robot-sit rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 3.2s ease-in-out infinite; }
+.robot-sit rect.eye.right { animation-delay: 0.05s; }
+@keyframes leg-swing { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-14deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .robot-sit rect.leg, .robot-sit rect.eye { animation: none !important; }
 }
 
 /* Tap the greeting robot: one-off reactions, cycled per tap. */
@@ -185,6 +198,17 @@ dialog.sheet[open]::backdrop {
   from { opacity: 0; }
 }
 
+/* Phone side menu slides in from the left edge, where its ☰ button sits. */
+dialog.side-menu[open] {
+  animation: side-in 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+dialog.side-menu[open]::backdrop {
+  animation: sheet-fade 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes side-in {
+  from { transform: translateX(-100%); }
+}
+
 /* Page gutters that clear the notch/rounded corners once viewport-fit=cover is on (landscape sides, standalone top). */
 @utility safe-gutter {
   padding-top: max(1rem, env(safe-area-inset-top));
@@ -192,17 +216,20 @@ dialog.sheet[open]::backdrop {
   padding-right: max(1rem, env(safe-area-inset-right));
 }
 
+/* Cards sit flat on the white page with a hairline border: no shadow, since nothing on a
+   dashboard needs to float above anything else. */
 @utility card {
-  @apply rounded-[24px] p-5;
+  @apply rounded-[20px] border border-line p-5;
 }
 @utility btn {
-  @apply inline-flex cursor-pointer items-center justify-center gap-2 min-h-11 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors duration-200 disabled:opacity-50;
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 min-h-11 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors duration-200 disabled:opacity-50;
 }
+/* The accent lives here: the one action per screen that moves things forward. */
 @utility btn-primary {
-  @apply btn bg-ink text-cream hover:bg-ink/85;
+  @apply btn bg-terra-strong text-white hover:bg-[#8A4633];
 }
 @utility btn-secondary {
-  @apply btn border border-ink/20 bg-cream text-ink hover:bg-cream-2;
+  @apply btn border border-line bg-white text-ink hover:bg-cream;
 }
 @utility btn-sm {
   @apply min-h-11 px-4 py-1.5 text-xs md:min-h-9;
@@ -211,10 +238,10 @@ dialog.sheet[open]::backdrop {
   @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;
 }
 @utility field {
-  @apply w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-ink;
+  @apply w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-ink;
 }
 @utility label {
-  @apply mb-1.5 block text-xs font-semibold tracking-wide text-ink-soft uppercase;
+  @apply mb-1.5 block text-xs font-semibold text-ink-soft;
 }
 @utility h-display {
   @apply font-display font-bold tracking-tight;

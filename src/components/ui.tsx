@@ -7,21 +7,19 @@ export function StatusPill({ status }: { status: RoomStatus }) {
   return <span className={`pill ${TONE_CLASS[STATUS_TONE[status]]}`}>{STATUS_LABEL[status]}</span>;
 }
 
-export function PageHeader({ title, subtitle, actions, titleRight, titleClassName = "font-greeting text-4xl leading-tight font-normal md:text-6xl", actionsClassName = "" }: {
-  title: string;
+// titleLabel: the heading's accessible name when `title` holds more than text (the Overview robot).
+export function PageHeader({ title, titleLabel, subtitle, actions, titleClassName = "font-greeting text-4xl leading-tight font-normal md:text-6xl", actionsClassName = "" }: {
+  title: ReactNode;
+  titleLabel?: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
-  titleRight?: ReactNode;
   titleClassName?: string;
   actionsClassName?: string;
 }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-[14rem] flex-1">
-        <div className="flex items-center gap-3">
-          <h1 className={titleClassName}>{title}</h1>
-          {titleRight}
-        </div>
+        <h1 className={titleClassName} aria-label={titleLabel}>{title}</h1>
         {subtitle && <div className="mt-1 text-sm text-ink-soft">{subtitle}</div>}
       </div>
       {actions && <div className={`flex flex-wrap items-center gap-2 ${actionsClassName}`}>{actions}</div>}
@@ -47,7 +45,7 @@ export function StatCard({ tone, icon, label, value, footer, chart }: {
       </div>
       <div className="mt-auto pt-4">
         <div className={`text-xs font-semibold ${tone === "ink" ? "opacity-75" : ""}`}>{label}</div>
-        <div className="num mt-1 text-2xl font-semibold tracking-tight break-words md:text-3xl">{value}</div>
+        <div className="num mt-1 text-2xl font-semibold tracking-tight break-words md:text-3xl xl:text-2xl 2xl:text-3xl">{value}</div>
         {footer && <div className="mt-2 text-xs">{footer}</div>}
       </div>
     </div>

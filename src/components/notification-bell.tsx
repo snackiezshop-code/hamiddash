@@ -63,7 +63,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
 
       {open && (
         <div role="dialog" aria-label="Notifications"
-          className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-line bg-white shadow-xl">
+          className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <span className="h-display text-base">Notifications</span>
             {count > 0 && <span className="pill bg-cream">{count}</span>}

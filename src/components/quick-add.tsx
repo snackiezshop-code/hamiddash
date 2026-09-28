@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { CaretRight, HandCoins, ListPlus, Receipt, UserPlus } from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
-import { addChecklistItem, addExpense, addTenant, updateRoomIncome } from "@/app/actions";
+import { IconAlarmClock, IconBanknote, IconChevronRight, IconReceipt, IconUserPlus, type AppIcon } from "./icons";
+import { addExpense, addReminder, addTenant, updateRoomIncome } from "@/app/actions";
 import { CATEGORY_LABEL, CATEGORY_OPTIONS, rupiah } from "@/lib/format";
-import { DuePills, Field, FormSheet, SelectPill, Sheet } from "./kit-client";
+import { Field, FormSheet, SelectPill, Sheet } from "./kit-client";
 import { AmountInput } from "./forms";
+import { ReminderFields } from "./reminder-form";
 
 export type QuickAddData = {
   period: { id: string; label: string } | null;
@@ -15,10 +15,11 @@ export type QuickAddData = {
   rooms: { id: string; number: number }[];
 };
 
-type Kind = "menu" | "payment" | "tenant" | "expense" | "task";
+type Kind = "menu" | "payment" | "tenant" | "expense" | "reminder";
+export type QuickAction = { kind: Exclude<Kind, "menu">; label: string; hint: string; icon: AppIcon; tone: string };
 type Preset = { roomId?: string; periodId?: string; periodLabel?: string };
 
-const Ctx = createContext<{ open: (kind: Kind, preset?: Preset) => void; isOpen: boolean } | null>(null);
+const Ctx = createContext<{ open: (kind: Kind, preset?: Preset) => void; isOpen: boolean; actions: QuickAction[] } | null>(null);
 
 export function useQuickAdd() {
   const ctx = useContext(Ctx);
@@ -39,8 +40,6 @@ export function QuickAddButton({ kind, preset, className = "btn-primary", childr
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-const TASK_CATEGORY_OPTIONS = ["Cleaning", "Maintenance", "Admin", "Other"].map((v) => ({ value: v, label: v }));
-
 export function QuickAddProvider({ data, children }: { data: QuickAddData; children: ReactNode }) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [preset, setPreset] = useState<Preset>({});
@@ -50,18 +49,18 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
   };
   const close = () => setKind(null);
 
-  const actions: { kind: Exclude<Kind, "menu">; label: string; hint: string; icon: Icon; tone: string }[] = [
-    { kind: "payment", label: "Record payment", hint: data.unpaid.length ? `${plural(data.unpaid.length, "room")} still unpaid` : "All rent is in", icon: HandCoins, tone: "bg-mint" },
-    { kind: "tenant", label: "Add tenant", hint: data.vacantRooms.length ? `${plural(data.vacantRooms.length, "room")} without a tenant` : "Every room has a tenant", icon: UserPlus, tone: "bg-peri" },
-    { kind: "expense", label: "Add expense", hint: data.period ? `To ${data.period.label}` : "Start a cash book first", icon: Receipt, tone: "bg-butter" },
-    { kind: "task", label: "Add task", hint: "Cleaning, maintenance, admin", icon: ListPlus, tone: "bg-blush" },
+  const actions: QuickAction[] = [
+    { kind: "payment", label: "Record payment", hint: data.unpaid.length ? `${plural(data.unpaid.length, "room")} still unpaid` : "All rent is in", icon: IconBanknote, tone: "bg-mint" },
+    { kind: "tenant", label: "Add tenant", hint: data.vacantRooms.length ? `${plural(data.vacantRooms.length, "room")} without a tenant` : "Every room has a tenant", icon: IconUserPlus, tone: "bg-peri" },
+    { kind: "expense", label: "Add expense", hint: data.period ? `To ${data.period.label}` : "Start a cash book first", icon: IconReceipt, tone: "bg-butter" },
+    { kind: "reminder", label: "Add reminder", hint: "Bills, repairs, admin", icon: IconAlarmClock, tone: "bg-blush" },
   ];
 
   const expensePeriodId = preset.periodId ?? data.period?.id;
   const expensePeriodLabel = preset.periodLabel ?? data.period?.label;
 
   return (
-    <Ctx.Provider value={{ open, isOpen: kind !== null }}>
+    <Ctx.Provider value={{ open, isOpen: kind !== null, actions }}>
       {children}
 
       <Sheet open={kind === "menu"} onClose={close} title="Quick add">
@@ -69,15 +68,15 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
           {actions.map((a) => (
             <li key={a.kind}>
               <button type="button" onClick={() => open(a.kind)}
-                className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-3xl bg-white px-4 py-2.5 text-left transition-transform duration-[120ms] hover:bg-cream-2 active:scale-[0.97]">
+                className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2.5 text-left transition-colors duration-200 hover:bg-cream">
                 <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink ${a.tone}`} aria-hidden>
-                  <a.icon size={20} weight="duotone" />
+                  <a.icon width={24} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">{a.label}</span>
                   <span className="block truncate text-xs text-ink-soft">{a.hint}</span>
                 </span>
-                <CaretRight size={18} weight="bold" className="text-ink-soft" aria-hidden />
+                <IconChevronRight width={16} className="text-ink-soft" />
               </button>
             </li>
           ))}
@@ -152,22 +151,8 @@ export function QuickAddProvider({ data, children }: { data: QuickAddData; child
         )}
       </FormSheet>
 
-      <FormSheet open={kind === "task"} onClose={close} title="Add task" submitLabel="Save task" action={addChecklistItem}>
-        <Field label="Task" htmlFor="qa-task-title">
-          <input id="qa-task-title" name="title" required placeholder="e.g. Clean the water tank" className="field" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <span className="label">Category</span>
-            <SelectPill name="category" ariaLabel="Category" options={TASK_CATEGORY_OPTIONS} />
-          </div>
-          <div>
-            <span className="label">Room</span>
-            <SelectPill name="roomId" ariaLabel="Room" defaultValue={preset.roomId ?? ""}
-              options={[{ value: "", label: "No room" }, ...data.rooms.map((r) => ({ value: r.id, label: `Room ${r.number}` }))]} />
-          </div>
-        </div>
-        <DuePills name="dueDate" label="Due" />
+      <FormSheet open={kind === "reminder"} onClose={close} title="Add reminder" submitLabel="Save reminder" action={addReminder}>
+        <ReminderFields idPrefix="qa-rem" rooms={data.rooms} defaults={{ roomId: preset.roomId }} />
       </FormSheet>
 
     </Ctx.Provider>

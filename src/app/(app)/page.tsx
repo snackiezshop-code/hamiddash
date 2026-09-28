@@ -6,30 +6,31 @@ import {
 } from "@/lib/format";
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
-import { dueReminders } from "@/lib/reminders";
+import { dueItems, dueReminders } from "@/lib/reminders";
+import { REPEAT_LABEL, daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
 import { startPeriod, toggleTransfer } from "@/app/actions";
 import { Empty, PageHeader, Section, Sparkline, WaButton } from "@/components/ui";
-import { Avatar, Chevron, CountPill, IconBadge, ListRow, taskCategoryMeta } from "@/components/kit";
+import { Avatar, Chevron, CountPill, EXPENSE_META, IconBadge, ListRow, taskCategoryMeta } from "@/components/kit";
 import { CountUpRupiah, GreetingRobot, PaidButton, PaidRow } from "@/components/delight";
 import { RobotSvg, Sparkle } from "@/components/robot";
 import { SubmitButton } from "@/components/forms";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
 import { RoomSearch } from "@/components/room-search";
 import { RoomDrawerProvider, RoomLink } from "@/components/room-drawer";
-import { AccountButton } from "@/components/nav";
-import { IconCalendar, IconCheck, IconSettings } from "@/components/icons";
+import { IconCalendar, IconCheck, IconChevronRight } from "@/components/icons";
 
 export default async function DashboardPage() {
   const now = todayJakarta();
-  const [latest, rooms, periods, openTasks, reminders] = await Promise.all([
+  const [latest, rooms, periods, upcoming, reminders, items] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
     db.cashPeriod.findMany({
       orderBy: [{ year: "asc" }, { month: "asc" }],
       include: { roomIncomes: true, additionalIncomes: true, expenses: true },
     }),
-    db.checklistItem.findMany({ where: { isDone: false }, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], take: 5 }),
+    db.reminder.findMany({ where: { isDone: false }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }], take: 5 }),
     dueReminders(now),
+    dueItems(now),
   ]);
   const overdueCount = reminders.filter((r) => r.daysUntilDue < 0).length;
 
@@ -43,7 +44,6 @@ export default async function DashboardPage() {
   const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
   const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const startOfTodayForOverdue = now;
   const endingLeases = rooms
     .filter((r) => r.tenant?.leaseEndDate && r.tenant.leaseEndDate <= soon)
     .sort((a, b) => a.tenant!.leaseEndDate!.getTime() - b.tenant!.leaseEndDate!.getTime());
@@ -76,6 +76,12 @@ export default async function DashboardPage() {
       detail: "This month's cash book hasn't been created yet",
       href: "/",
     }] : []),
+    ...items.map((i) => ({
+      id: `reminder-${i.id}`, tone: (i.daysUntilDue < 0 ? "blush" : "butter") as Notification["tone"],
+      title: i.amount ? `${i.title} · ${rupiah(i.amount)}` : i.title,
+      detail: `${reminderDueLabel(i.daysUntilDue)} (${formatDate(i.dueDate)}) · tap to mark it ${i.amount ? "paid" : "done"}`,
+      href: "/pengingat",
+    })),
     ...(overdueCount ? [{
       id: "overdue", tone: "blush" as const,
       title: `${overdueCount} tenant${overdueCount > 1 ? "s" : ""} past the due date`,
@@ -106,12 +112,6 @@ export default async function DashboardPage() {
       detail: `${r.tenant!.name} · ${formatDate(r.tenant!.leaseEndDate)}`,
       href: `/kamar/${r.number}`,
     })),
-    ...openTasks.filter((t) => t.dueDate && t.dueDate < startOfTodayForOverdue).map((t) => ({
-      id: `task-${t.id}`, tone: "blush" as const,
-      title: `Overdue task`,
-      detail: `${t.title} · due ${formatDate(t.dueDate)}`,
-      href: "/checklist",
-    })),
     ...(latest && transfersDone < transfersDue.length ? [{
       id: "transfers", tone: "peri" as const,
       title: `${transfersDue.length - transfersDone} transfers not sent`,
@@ -122,22 +122,27 @@ export default async function DashboardPage() {
 
   return (
     <RoomDrawerProvider rooms={rooms.map(toDrawerRoom)}>
+      {/* The robot sits on the "M" of Max. Its box is sized in em so it tracks the heading's font size:
+          the seat line (2/3 down the robot, 0.63em) lands on the top of the M (0.22em below its box). */}
       <PageHeader
-        title={`${greeting}, Max!`}
-        titleRight={<GreetingRobot mood={mood} />}
+        titleLabel={`${greeting}, Max!`}
+        titleClassName="font-greeting pt-[0.55em] text-4xl leading-tight font-normal md:text-6xl"
+        title={<>
+          {greeting},{" "}
+          <span className="relative inline-block">
+            M
+            <GreetingRobot mood={mood} className="absolute top-[-0.41em] left-1/2 h-[0.95em] w-[0.95em] -translate-x-1/2" />
+          </span>
+          ax!
+        </>}
         subtitle={
           <div className="mt-3 flex items-center gap-2">
-            <AccountButton className="md:hidden" />
             <RoomSearch rooms={rooms.map((r) => ({
               number: r.number, status: r.status, tenant: r.tenant?.name ?? null, phone: r.tenant?.phone ?? null,
             }))} />
             {/* relative: the bell's panel anchors to this row's right edge, not the bell's, so it stays on screen. */}
             <div className="relative flex shrink-0 items-center gap-2 md:hidden">
               <NotificationBell notifications={notifications} />
-              <Link href="/pengaturan" aria-label="Settings"
-                className="grid h-11 w-11 place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:bg-cream-2">
-                <IconSettings width={20} height={20} />
-              </Link>
             </div>
           </div>
         }
@@ -175,7 +180,7 @@ export default async function DashboardPage() {
                         subtitle={
                           <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                             <span className="num">{rupiah(inc.room.monthlyRent)}</span>
-                            <span className="pill bg-terra-strong py-0 text-[#F6F1E5]">Unpaid</span>
+                            <span className="pill bg-blush py-0 text-blush-deep">Unpaid</span>
                             {reminderToday && <span className="pill bg-butter py-0 text-butter-deep">Reminder today</span>}
                           </span>
                         }
@@ -219,26 +224,28 @@ export default async function DashboardPage() {
                   <CountUpRupiah from={summary.openingBalance} to={summary.closingBalance} />
                 </div>
               </div>
-              <dl className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                {/* Each row opens that part of the cash book: rent, or the expense list with its details. */}
                 {([
-                  ["Income", summary.incomeTotal, "bg-mint"],
-                  ["Expenses", summary.expenseTotal, "bg-terra"],
-                ] as const).map(([name, n, bar]) => (
-                  <div key={name}>
+                  ["Income", summary.incomeTotal, "bg-mint", "rent"],
+                  ["Expenses", summary.expenseTotal, "bg-terra", "expenses"],
+                ] as const).map(([name, n, bar, tab]) => (
+                  <Link key={name} href={`/kas/${latestSlug}?tab=${tab}`}
+                    className="-mx-2 block rounded-2xl px-2 py-1.5 transition-colors hover:bg-cream/10">
                     <div className="flex items-baseline justify-between gap-3 text-xs">
-                      <dt className="opacity-75">{name}</dt>
-                      <dd className="num font-semibold">{rupiah(n)}</dd>
+                      <span className="opacity-75">{name}</span>
+                      <span className="num flex items-center gap-1 font-semibold">{rupiah(n)} <IconChevronRight width={12} height={12} className="opacity-60" /></span>
                     </div>
                     <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-cream/10" aria-hidden>
                       <div className={`h-full rounded-full ${bar}`}
                         style={{ width: `${(n / Math.max(summary.incomeTotal, summary.expenseTotal, 1)) * 100}%` }} />
                     </div>
-                  </div>
+                  </Link>
                 ))}
-              </dl>
+              </div>
               <div className="flex items-center justify-between gap-3 border-t border-cream/15 pt-3 text-xs">
                 <span className="opacity-75">Net cash flow</span>
-                <span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-terra-strong text-[#F6F1E5]"}`}>
+                <span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
                   {summary.netFlow >= 0 ? "+" : ""}{rupiah(summary.netFlow)}
                 </span>
               </div>
@@ -318,18 +325,26 @@ export default async function DashboardPage() {
             </Section>
           )}
 
-          <Section title="Open tasks" action={<Link href="/checklist" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">View all</Link>}>
-            {openTasks.length === 0 ? <Empty>No open tasks.</Empty> : (
+          <Section title="Coming up" action={<Link href="/pengingat" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">All reminders</Link>}>
+            {upcoming.length === 0 ? <Empty>Nothing coming up. Add a reminder from the menu.</Empty> : (
               <ul className="divide-y divide-line">
-                {openTasks.map((t) => {
-                  const meta = taskCategoryMeta(t.category);
+                {upcoming.map((r) => {
+                  const meta = r.amount && r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag);
+                  const days = daysUntil(r.dueDate, now);
                   return (
-                    <li key={t.id}>
-                      <ListRow
-                        leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
-                        title={t.title}
-                        subtitle={[t.category, t.roomId && roomNumberById.get(t.roomId) && `Room ${roomNumberById.get(t.roomId)}`].filter(Boolean).join(" · ") || undefined}
-                        trailing={t.dueDate ? <span className="num shrink-0 text-xs text-ink-soft">{formatDate(t.dueDate)}</span> : undefined} />
+                    <li key={r.id}>
+                      <Link href="/pengingat" className="block">
+                        <ListRow
+                          leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
+                          title={r.title}
+                          subtitle={[r.amount ? rupiah(r.amount) : null, r.repeat !== "NONE" ? REPEAT_LABEL[r.repeat] : null,
+                            r.roomId && roomNumberById.get(r.roomId) ? `Room ${roomNumberById.get(r.roomId)}` : null].filter(Boolean).join(" · ") || undefined}
+                          trailing={
+                            <span className={`pill shrink-0 ${days !== null && days < 0 ? "bg-blush text-blush-deep" : days !== null && days <= 1 ? "bg-butter text-butter-deep" : "bg-cream text-ink-soft"}`}>
+                              {days !== null && days > 1 ? formatDate(r.dueDate) : reminderDueLabel(days)}
+                            </span>
+                          } />
+                      </Link>
                     </li>
                   );
                 })}

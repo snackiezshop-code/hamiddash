@@ -14,7 +14,7 @@ async function main() {
     additionalIncomes: await db.additionalIncome.findMany(),
     expenses: await db.expense.findMany(),
     transferChecks: await db.transferCheck.findMany(),
-    checklistItems: await db.checklistItem.findMany(),
+    reminders: await db.reminder.findMany(),
   };
   writeFileSync("prisma/data-export.json", JSON.stringify(dump, null, 2));
   console.log(Object.fromEntries(Object.entries(dump).map(([k, v]) => [k, v.length])));

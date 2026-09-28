@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { logout } from "@/app/actions";
-import { IconDoor, IconHome, IconList, IconLogout, IconSettings, IconUser, IconWallet } from "./icons";
+import { IconBell, IconClose, IconDoor, IconHome, IconLogout, IconMenu, IconPlus, IconSettings, IconUser, IconWallet } from "./icons";
 import { Logo } from "./logo";
-import { Plus } from "@phosphor-icons/react";
 import { useQuickAdd } from "./quick-add";
 import { MiniCalendar, type ReminderEntry } from "./mini-calendar";
 import { Sheet } from "./kit-client";
@@ -16,26 +15,23 @@ const MAIN_ITEMS = [
   { href: "/", label: "Overview", icon: IconHome },
   { href: "/kamar", label: "Rooms", icon: IconDoor },
   { href: "/kas", label: "Cash Book", icon: IconWallet },
-  { href: "/checklist", label: "Checklist", icon: IconList },
+  { href: "/pengingat", label: "Reminders", icon: IconBell },
 ];
 const SETTINGS_ITEM = { href: "/pengaturan", label: "Settings", icon: IconSettings };
+const ADMIN_NAME = "Max";
 
-// `href` is the section (for the active state); `to` is where the tab links, e.g. the latest cash book month.
+type NavProps = { cashHref: string; dueCount: number };
+
+// `href` is the section (for the active state); `to` is where the link goes, e.g. the latest cash book month.
 function mainItems(cashHref: string) {
   return MAIN_ITEMS.map((item) => ({ ...item, to: item.href === "/kas" ? cashHref : item.href }));
-}
-
-function navLinkClass(active: boolean) {
-  return `flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
-    active ? "bg-cream text-ink" : "text-cream/70 hover:bg-white/10 hover:text-cream"
-  }`;
 }
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
-// Moves the active highlight to a tapped tab straight away instead of when the new screen arrives.
+// Moves the active highlight to a tapped link straight away instead of when the new screen arrives.
 // The tap only counts while the pathname is still the one it was made on, so it clears itself on arrival.
 function useNavHighlight() {
   const pathname = usePathname();
@@ -50,120 +46,199 @@ function useNavHighlight() {
   };
 }
 
-const ADMIN_NAME = "Max";
+// Active: warm fill, ink text, icon in the accent. Inactive rows stay quiet.
+function navLinkClass(active: boolean) {
+  return `flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-200 ${
+    active ? "bg-cream text-ink [&_svg]:text-terra-strong" : "text-ink-soft hover:bg-cream hover:text-ink"
+  }`;
+}
 
-export function Sidebar({ reminders, cashHref }: { reminders: ReminderEntry[]; cashHref: string }) {
+function NavLinks({ cashHref, dueCount, onNavigate }: NavProps & { onNavigate?: () => void }) {
   const { isOn, onTap } = useNavHighlight();
   return (
-    <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-60 shrink-0 flex-col rounded-[28px] bg-ink p-5 text-cream md:flex">
-      <Link href="/" className="mb-8 flex items-center gap-2.5 px-2">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-white p-1.5">
-          <Logo className="h-full w-full" />
-        </span>
-        <span className="font-greeting text-2xl leading-none font-normal">Hamid</span>
-      </Link>
-      <nav className="flex flex-col gap-1">
-        {mainItems(cashHref).map(({ href, to, label, icon: Icon }) => (
-          <Link key={href} href={to} onClick={onTap(href)} className={navLinkClass(isOn(href))}>
-            <Icon width={22} height={22} />
-            {label}
-          </Link>
-        ))}
-      </nav>
+    <nav aria-label="Main" className="flex flex-col gap-0.5">
+      {mainItems(cashHref).map(({ href, to, label, icon: Icon }) => (
+        <Link key={href} href={to} aria-current={isOn(href) ? "page" : undefined}
+          onClick={(e) => { onTap(href)(e); onNavigate?.(); }} className={navLinkClass(isOn(href))}>
+          <Icon width={20} height={20} />
+          <span className="flex-1">{label}</span>
+          {href === "/pengingat" && dueCount > 0 && (
+            <span className="num grid h-6 min-w-6 place-items-center rounded-full bg-blush px-1.5 text-xs font-semibold text-blush-deep"
+              aria-label={`${dueCount} due`}>{dueCount}</span>
+          )}
+        </Link>
+      ))}
+    </nav>
+  );
+}
 
-      <div className="flex flex-1 flex-col justify-center overflow-y-auto py-4">
-        <MiniCalendar reminders={reminders} />
+function SettingsLink({ onNavigate }: { onNavigate?: () => void }) {
+  const { isOn, onTap } = useNavHighlight();
+  return (
+    <Link href={SETTINGS_ITEM.href} aria-current={isOn(SETTINGS_ITEM.href) ? "page" : undefined}
+      onClick={(e) => { onTap(SETTINGS_ITEM.href)(e); onNavigate?.(); }} className={navLinkClass(isOn(SETTINGS_ITEM.href))}>
+      <IconSettings width={20} height={20} />
+      {SETTINGS_ITEM.label}
+    </Link>
+  );
+}
+
+function AccountRow() {
+  return (
+    <div className="flex items-center gap-2.5 border-t border-line px-1 pt-3">
+      <IconUser width={32} height={32} className="shrink-0 text-ink-soft" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold">{ADMIN_NAME}</div>
+        <div className="text-xs text-ink-soft">Admin</div>
       </div>
+      <form action={logout}>
+        <button aria-label="Log out" title="Log out"
+          className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft transition-colors hover:bg-cream hover:text-ink">
+          <IconLogout />
+        </button>
+      </form>
+    </div>
+  );
+}
 
-      <Link href={SETTINGS_ITEM.href} onClick={onTap(SETTINGS_ITEM.href)} className={`mb-3 ${navLinkClass(isOn(SETTINGS_ITEM.href))}`}>
-        <IconSettings width={22} height={22} />
-        {SETTINGS_ITEM.label}
-      </Link>
+function Brand() {
+  return (
+    <Link href="/" className="flex min-h-11 items-center gap-2.5 px-1">
+      <Logo className="h-8 w-8 shrink-0" />
+      <span className="font-greeting text-2xl leading-none">Hamid</span>
+    </Link>
+  );
+}
 
-      <div className="flex items-center gap-2.5 border-t border-cream/10 px-2 pt-3">
-        <IconUser width={32} height={32} className="shrink-0 text-cream/80" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{ADMIN_NAME}</div>
-          <div className="text-xs text-cream/50">Admin</div>
-        </div>
-        <form action={logout}>
-          <button aria-label="Log out" title="Log out"
-            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full text-cream/70 hover:bg-white/10 hover:text-cream">
-            <IconLogout />
-          </button>
-        </form>
+export function Sidebar({ reminders, ...nav }: NavProps & { reminders: ReminderEntry[] }) {
+  const { open } = useQuickAdd();
+  return (
+    <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-60 shrink-0 flex-col gap-5 overflow-y-auto rounded-[20px] border border-line bg-white p-4 md:flex">
+      <Brand />
+      <button type="button" onClick={() => open("menu")} aria-haspopup="dialog" className="btn-primary w-full">
+        <IconPlus width={18} height={18} /> Add
+      </button>
+      <NavLinks {...nav} />
+      <div className="mt-auto flex flex-col gap-3">
+        <MiniCalendar reminders={reminders} />
+        <SettingsLink />
+        <AccountRow />
       </div>
     </aside>
   );
 }
 
-export function BottomBar({ cashHref }: { cashHref: string }) {
-  const { isOn, onTap } = useNavHighlight();
-  const { open, isOpen } = useQuickAdd();
-  const items = mainItems(cashHref);
-  const tab = ({ href, to, label, icon: Icon }: (typeof items)[number]) => {
-    const active = isOn(href);
-    return (
-      <Link key={href} href={to} onClick={onTap(href)} aria-current={active ? "page" : undefined}
-        className={`flex h-14 min-w-12 shrink-0 flex-col min-[360px]:min-w-14 items-center justify-center gap-0.5 rounded-full px-1 text-[12px] leading-4 font-semibold transition-[background-color,color,transform] duration-200 active:scale-95 ${
-          active ? "bg-cream text-ink" : "text-cream/75"
-        }`}>
-        {/* Active tab: a 56px-tall pill shade holding icon + label (widens for "Checklist" at 12px), icon in its own small circle. */}
-        <span className={`grid h-5 w-5 place-items-center rounded-full transition-colors duration-200 ${active ? "bg-cream-2" : ""}`}>
-          <Icon width={16} height={16} />
-        </span>
-        <span className="max-w-full truncate">{label.split(" ")[0]}</span>
-      </Link>
-    );
-  };
+// Phones: a slim top bar with the menu button, because Safari's address bar sits at the bottom.
+// Everything else, quick add included, lives in the side menu it opens.
+export function MobileTopBar(nav: NavProps) {
+  const [open, setOpen] = useState(false);
   return (
-    // Spans the same width as the page column (its safe-gutter edges), fully rounded ends.
-    <nav aria-label="Main" className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-3 left-[max(1rem,env(safe-area-inset-left))] z-40 flex items-center rounded-full bg-ink p-1.5 text-cream md:hidden"
-      style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="flex flex-1 justify-around">{items.slice(0, 2).map(tab)}</div>
-      <div className="relative w-14 shrink-0 self-stretch">
-        <button type="button" onClick={() => open("menu")} aria-label="Quick add" aria-haspopup="dialog"
-          className="absolute -top-[34px] left-1/2 grid h-14 w-14 -translate-x-1/2 cursor-pointer place-items-center rounded-full border-4 border-cream bg-terra text-[#F6F1E5] transition-transform duration-[120ms] active:scale-90">
-          {/* Turns into an × while any quick-add sheet is open. */}
-          <Plus size={24} weight="bold" aria-hidden className={`transition-transform duration-200 ${isOpen ? "rotate-45" : ""}`} />
-        </button>
-      </div>
-      <div className="flex flex-1 justify-around">{items.slice(2).map(tab)}</div>
-    </nav>
+    <>
+      <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur-sm md:hidden"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <div className="flex h-14 items-center gap-2 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(0.5rem,env(safe-area-inset-left))]">
+          <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-haspopup="dialog" aria-expanded={open}
+            className="relative grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-colors hover:bg-cream">
+            <IconMenu />
+            {nav.dueCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-terra-strong" aria-hidden />}
+          </button>
+          <Brand />
+        </div>
+      </header>
+      <SideMenu open={open} onClose={() => setOpen(false)} {...nav} />
+    </>
   );
 }
 
-// Phones have no sidebar, so the Overview header carries this button for logging out.
+function SideMenu({ open, onClose, ...nav }: NavProps & { open: boolean; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const { open: openQuickAdd, actions } = useQuickAdd();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
+
+  // Leaving the page (a nav link, back/forward) closes the menu.
+  const lastPath = useRef(pathname);
+  useEffect(() => {
+    if (lastPath.current !== pathname && open) onClose();
+    lastPath.current = pathname;
+  }, [pathname, open, onClose]);
+
+  return (
+    <dialog ref={ref} aria-label="Menu" onClose={() => { if (open) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="side-menu fixed inset-y-0 right-auto left-0 m-0 h-dvh max-h-none w-[min(20rem,86vw)] overflow-y-auto bg-white p-0 text-ink backdrop:bg-ink/35 md:hidden">
+      <div className="flex min-h-full flex-col gap-5 p-4"
+        style={{ paddingTop: "max(1rem, env(safe-area-inset-top))", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+        <div className="flex items-center justify-between">
+          <Brand />
+          <button type="button" onClick={onClose} aria-label="Close menu"
+            className="grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-colors hover:bg-cream">
+            <IconClose />
+          </button>
+        </div>
+
+        <NavLinks {...nav} onNavigate={onClose} />
+
+        <section aria-labelledby="menu-add">
+          <h2 id="menu-add" className="mb-1.5 px-3 text-xs font-semibold text-ink-soft">Add</h2>
+          <ul className="flex flex-col gap-0.5">
+            {actions.map((a) => (
+              <li key={a.kind}>
+                <button type="button" onClick={() => { onClose(); openQuickAdd(a.kind); }}
+                  className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-1.5 text-left text-sm font-semibold transition-colors duration-200 hover:bg-cream">
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink ${a.tone}`} aria-hidden>
+                    <a.icon width={24} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{a.label}</span>
+                    <span className="block truncate text-xs font-normal text-ink-soft">{a.hint}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div className="mt-auto flex flex-col gap-3">
+          <SettingsLink onNavigate={onClose} />
+          <AccountRow />
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+// Overview header button on phones for account details and logging out (also in the side menu).
 export function AccountButton({ className = "" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label="Account" aria-haspopup="dialog"
-        className={`grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:bg-cream-2 ${className}`}>
+        className={`grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-white text-ink transition-colors hover:bg-cream ${className}`}>
         <IconUser width={22} height={22} />
       </button>
-      <AccountSheet open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
-
-function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <Sheet open={open} onClose={onClose} title="Account">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3 rounded-3xl bg-white px-4 py-3">
-          <IconUser width={40} height={40} className="shrink-0" />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{ADMIN_NAME}</div>
-            <div className="text-xs text-ink-soft">Admin · Kost Mujair 12</div>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Account">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3">
+            <IconUser width={40} height={40} className="shrink-0" />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold">{ADMIN_NAME}</div>
+              <div className="text-xs text-ink-soft">Admin · Kost Mujair 12</div>
+            </div>
           </div>
+          <form action={logout}>
+            <SubmitButton className="btn-secondary w-full" pendingText="Logging out…">
+              <IconLogout width={18} height={18} /> Log out
+            </SubmitButton>
+          </form>
         </div>
-        <form action={logout}>
-          <SubmitButton className="btn-secondary w-full" pendingText="Logging out…">
-            <IconLogout width={18} height={18} /> Log out
-          </SubmitButton>
-        </form>
-      </div>
-    </Sheet>
+      </Sheet>
+    </>
   );
 }

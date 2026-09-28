@@ -142,18 +142,6 @@ model TransferCheck {
   @@unique([periodId, recipientId])
 }
 
-// General task tracking (cleaning, maintenance, admin) — separate from the monthly transfer checklist.
-model ChecklistItem {
-  id          String    @id @default(cuid())
-  title       String
-  category    String? // e.g. Cleaning, Maintenance, Admin
-  isDone      Boolean   @default(false)
-  dueDate     DateTime?
-  roomId      String? // optional link to a specific room
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-}
-
 // Browsers/phones that get the daily "reminders due" push (Pengaturan → Reminder alerts).
 model PushSubscription {
   id        String   @id @default(cuid())
@@ -161,4 +149,30 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+}
+
+enum Repeat {
+  NONE
+  WEEKLY
+  BIWEEKLY // every 14 days, e.g. the cleaning service
+  MONTHLY
+  YEARLY
+}
+
+// Anything to remember that isn't tenant rent (rent reminders come from each tenant's reminder day):
+// bills like the cleaning service, repairs, admin. Marking a repeating reminder done moves dueDate on
+// by its repeat; with an amount, it also records the expense in that month's cash book.
+model Reminder {
+  id        String           @id @default(cuid())
+  title     String
+  tag       String? // Cleaning / Maintenance / Admin / Other (carried over from the old checklist)
+  roomId    String? // optional link to a specific room
+  dueDate   DateTime? // Jakarta calendar date, stored as UTC midnight
+  repeat    Repeat           @default(NONE)
+  amount    Int? // Rp; set for bills
+  category  ExpenseCategory? // cash book category for the expense a bill records
+  isDone    Boolean          @default(false) // one-off reminders only
+  doneAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }

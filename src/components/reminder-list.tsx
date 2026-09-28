@@ -1,0 +1,145 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import type { ExpenseCategory, Repeat } from "@/generated/prisma/enums";
+import { completeReminder, deleteReminder, reopenReminder, updateReminder } from "@/app/actions";
+import { dateInputValue, formatDate, rupiah } from "@/lib/format";
+import { REPEAT_LABEL, dueLabel } from "@/lib/reminder-items";
+import { errorDetails, reportClientIssue } from "@/lib/client-log";
+import { EXPENSE_META, IconBadge, taskCategoryMeta } from "./kit";
+import { Sheet } from "./kit-client";
+import { ConfirmButton, SubmitButton } from "./forms";
+import { ReminderFields } from "./reminder-form";
+import { IconCheck, IconTrash, IconUndo } from "./icons";
+
+export type ReminderItem = {
+  id: string;
+  title: string;
+  tag: string | null;
+  roomNumber: number | null;
+  roomId: string | null;
+  dueDate: Date | null;
+  daysUntilDue: number | null; // worked out on the server in Jakarta time
+  repeat: Repeat;
+  amount: number | null;
+  category: ExpenseCategory | null;
+  isDone: boolean;
+  doneAt: Date | null;
+};
+
+const metaOf = (r: ReminderItem) => (r.amount && r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag));
+
+function dueTone(days: number | null) {
+  if (days === null) return "bg-cream text-ink-soft";
+  if (days < 0) return "bg-blush text-blush-deep";
+  if (days <= 1) return "bg-butter text-butter-deep";
+  return "bg-cream text-ink-soft";
+}
+
+// Open reminders: tap a row to edit it, Done/Paid on the right. Done ones: Undo instead.
+export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: { id: string; number: number }[] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const current = items.find((r) => r.id === openId) ?? null;
+
+  return (
+    <>
+      <ul className="divide-y divide-line">
+        {items.map((r) => {
+          const meta = metaOf(r);
+          const details = [
+            r.amount ? rupiah(r.amount) : null,
+            r.repeat !== "NONE" ? REPEAT_LABEL[r.repeat] : null,
+            r.roomNumber ? `Room ${r.roomNumber}` : null,
+          ].filter(Boolean).join(" · ");
+          return (
+            <li key={r.id} className="flex items-center gap-2 py-1">
+              <button type="button" onClick={() => setOpenId(r.id)} aria-haspopup="dialog"
+                className="-ml-2 flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors duration-200 hover:bg-cream">
+                <IconBadge icon={meta.icon} tone={meta.tone} />
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-sm font-semibold break-words ${r.isDone ? "text-ink-soft line-through" : ""}`}>{r.title}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-ink-soft">
+                    {r.isDone
+                      ? <span>Done {formatDate(r.doneAt)}</span>
+                      : <span className={`pill py-0 ${dueTone(r.daysUntilDue)}`}>
+                          {r.daysUntilDue !== null && r.daysUntilDue > 1 ? formatDate(r.dueDate) : dueLabel(r.daysUntilDue)}
+                        </span>}
+                    {details && <span className="num">{details}</span>}
+                  </span>
+                </span>
+              </button>
+              {r.isDone ? <UndoButton id={r.id} title={r.title} /> : <DoneButton item={r} />}
+            </li>
+          );
+        })}
+      </ul>
+      <ReminderSheet key={current?.id ?? "none"} item={current} rooms={rooms} onClose={() => setOpenId(null)} />
+    </>
+  );
+}
+
+// A bill says Paid (it records the expense); everything else says Done. Errors show under the button.
+function DoneButton({ item }: { item: ReminderItem }) {
+  const [error, action] = useActionState(completeReminder, null);
+  const label = item.amount ? "Paid" : "Done";
+  return (
+    <form action={action} className="flex shrink-0 flex-col items-end gap-1">
+      <input type="hidden" name="id" value={item.id} />
+      <SubmitButton className="btn btn-sm border border-line bg-white text-ink hover:bg-mint hover:text-mint-deep" pendingText="Saving…"
+        aria-label={`Mark "${item.title}" ${label.toLowerCase()}`}>
+        <IconCheck width={16} height={16} strokeWidth={3} /> {label}
+      </SubmitButton>
+      {error && <p role="alert" className="max-w-44 text-right text-xs font-semibold text-blush-deep">{error}</p>}
+    </form>
+  );
+}
+
+function UndoButton({ id, title }: { id: string; title: string }) {
+  return (
+    <form action={reopenReminder} className="shrink-0">
+      <input type="hidden" name="id" value={id} />
+      <SubmitButton className="btn btn-sm border border-line bg-white text-ink hover:bg-cream" pendingText="…" aria-label={`Undo "${title}"`}>
+        <IconUndo width={16} /> Undo
+      </SubmitButton>
+    </form>
+  );
+}
+
+function ReminderSheet({ item, rooms, onClose }: { item: ReminderItem | null; rooms: { id: string; number: number }[]; onClose: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Sheet open={Boolean(item)} onClose={onClose} title="Edit reminder">
+      {item && (
+        <div className="flex flex-col gap-4">
+          <form className="flex flex-col gap-4"
+            action={async (fd) => {
+              setError(null);
+              try {
+                const res = await updateReminder(fd);
+                if (typeof res === "string") setError(res);
+                else onClose();
+              } catch (err) {
+                reportClientIssue("form-save-failed", { form: "Edit reminder", ...errorDetails(err) });
+                setError("Couldn't save. Check your connection and try again.");
+              }
+            }}>
+            <input type="hidden" name="id" value={item.id} />
+            <ReminderFields idPrefix={`rem-${item.id}`} rooms={rooms} defaults={{
+              title: item.title, dueDate: dateInputValue(item.dueDate), repeat: item.repeat,
+              amount: item.amount, category: item.category, tag: item.tag, roomId: item.roomId,
+            }} />
+            {error && <p role="alert" className="rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+            <SubmitButton className="btn-primary w-full" pendingText="Saving…">Save changes</SubmitButton>
+          </form>
+          <form action={deleteReminder} className="flex justify-center">
+            <input type="hidden" name="id" value={item.id} />
+            <ConfirmButton message={`Delete reminder "${item.title}"?`} aria-label={`Delete reminder ${item.title}`}
+              className="btn btn-sm cursor-pointer text-ink-soft hover:bg-blush hover:text-blush-deep">
+              <IconTrash width={16} height={16} /> Delete reminder
+            </ConfirmButton>
+          </form>
+        </div>
+      )}
+    </Sheet>
+  );
+}

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#17140f",
+  themeColor: "#ffffff",
   // Lets env(safe-area-inset-*) report the notch/home-indicator insets; gutters use them (safe-gutter).
   viewportFit: "cover",
 };

@@ -84,7 +84,7 @@ export const STATUS_TONE: Record<RoomStatus, "mint" | "blush" | "butter" | "peri
 
 export const TONE_CLASS = {
   mint: "bg-mint text-mint-deep",
-  blush: "bg-terra-strong text-[#F6F1E5]",
+  blush: "bg-blush text-blush-deep",
   butter: "bg-butter text-butter-deep",
   peri: "bg-peri text-peri-deep",
   ink: "bg-ink text-cream",

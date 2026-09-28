@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { daysBetween, dueDateOf, reminderText, shiftMonth, todayJakarta, waLink } from "./format";
+import { ALERT_DAYS_BEFORE } from "./reminder-items";
 
 // Days before the due date that a reminder is flagged: 3 days ahead, then on the day itself.
 export const REMINDER_OFFSETS = [3, 0] as const;
@@ -76,4 +77,29 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
   }
   // Most overdue first, then due today, then upcoming.
   return out.sort((a, b) => a.daysUntilDue - b.daysUntilDue || a.roomNumber - b.roomNumber);
+}
+
+// ---------- Your own reminders (bills, repairs, admin) ----------
+
+export type DueItem = {
+  id: string;
+  title: string;
+  amount: number | null;
+  dueDate: Date;
+  daysUntilDue: number; // negative once overdue
+  alertToday: boolean; // include in today's push alert
+};
+
+// Open reminders due within 3 days or already late, most overdue first. Undated ones never alert.
+export async function dueItems(today: Date = todayJakarta()): Promise<DueItem[]> {
+  const rows = await db.reminder.findMany({ where: { isDone: false, dueDate: { not: null } }, orderBy: { dueDate: "asc" } });
+  return rows
+    .map((r) => {
+      const days = daysBetween(today, r.dueDate!);
+      return {
+        id: r.id, title: r.title, amount: r.amount, dueDate: r.dueDate!, daysUntilDue: days,
+        alertToday: ALERT_DAYS_BEFORE.includes(days) || isOverdueAlertDay(-days),
+      };
+    })
+    .filter((r) => r.daysUntilDue <= REMINDER_OFFSETS[0]);
 }

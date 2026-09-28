@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { CaretDown, Check, X } from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
+import { IconCheck, IconChevronDown, IconClose, type AppIcon } from "./icons";
 import { errorDetails, reportClientIssue } from "@/lib/client-log";
 
 // Soft tint = secondary (close/back), solid ink = primary (confirm/add). Dashed outlines are
@@ -28,7 +27,7 @@ function SubmitCircle({ label }: { label: string }) {
   return (
     <HeaderButton variant="solid" type="submit" disabled={pending} aria-label={pending ? "Saving" : label}>
       {pending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-cream/40 border-t-cream" aria-hidden />
-        : <Check size={20} weight="bold" aria-hidden />}
+        : <IconCheck width={24} />}
     </HeaderButton>
   );
 }
@@ -77,7 +76,7 @@ export function Sheet({ open, onClose, title, children, headerRight }: {
 
   return (
     <dialog {...dialog} aria-labelledby={titleId}
-      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[28px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[28px]">
+      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[24px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[24px]">
       <div className="px-5 pt-4" style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
         <SheetHeader titleId={titleId} title={title} onClose={onClose} right={headerRight} />
@@ -91,7 +90,7 @@ function SheetHeader({ titleId, title, onClose, right }: { titleId: string; titl
   return (
     <div className="mb-4 flex items-center gap-3">
       <HeaderButton variant="soft" onClick={onClose} aria-label="Close">
-        <X size={18} weight="bold" aria-hidden />
+        <IconClose width={24} />
       </HeaderButton>
       <h2 id={titleId} className="min-w-0 flex-1 truncate text-center font-display text-lg font-bold">{title}</h2>
       {right ?? <span className="h-11 w-11 shrink-0" aria-hidden />}
@@ -115,7 +114,7 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
 
   return (
     <dialog {...dialog} aria-labelledby={titleId}
-      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[28px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[28px]">
+      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[24px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[24px]">
       {open && (
         <form
           className="px-5 pt-4"
@@ -134,7 +133,7 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
           <SheetHeader titleId={titleId} title={title} onClose={onClose} right={canSubmit ? <SubmitCircle label={submitLabel} /> : undefined} />
           <div className="flex flex-col gap-4">{children}</div>
-          {error && <p role="alert" className="mt-4 rounded-2xl bg-terra-strong px-4 py-3 text-sm font-semibold text-[#F6F1E5]">{error}</p>}
+          {error && <p role="alert" className="mt-4 rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
           {canSubmit && <SubmitWide label={submitLabel} />}
         </form>
       )}
@@ -155,14 +154,14 @@ export type SelectOption = { value: string; label: string; hint?: string };
 
 // Pill dropdown replacing native <select> (brief 6.7). Listbox pattern: arrows, Home/End, Enter/Space, Escape, type-ahead.
 // `required`: starts with nothing chosen and blocks the form's submit until an option is picked.
-export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, ariaLabel, icon: Glyph, className = "", tone = "bg-cream-2", disabled, required, requiredMessage = "Choose an option" }: {
+export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, ariaLabel, icon: Glyph, className = "", tone = "border border-line bg-white", disabled, required, requiredMessage = "Choose an option" }: {
   name?: string;
   options: SelectOption[];
   defaultValue?: string;
   onChange?: (value: string) => void;
   autoSubmit?: boolean;
   ariaLabel: string;
-  icon?: Icon;
+  icon?: AppIcon;
   className?: string;
   tone?: string;
   disabled?: boolean;
@@ -246,14 +245,14 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
         aria-activedescendant={open ? `${id}-opt-${active}` : undefined}
         aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-err` : undefined}
         onClick={() => (open ? setOpen(false) : openList())} onKeyDown={onKeyDown}
-        className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-full px-4 text-left text-sm font-semibold disabled:opacity-60 ${tone} ${invalid ? "ring-2 ring-blush-deep" : ""}`}>
-        {Glyph && <Glyph size={18} weight="duotone" className="shrink-0" aria-hidden />}
+        className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold disabled:opacity-60 ${tone} ${invalid ? "ring-2 ring-blush-deep" : ""}`}>
+        {Glyph && <Glyph width={24} className="shrink-0" />}
         <span className={`min-w-0 flex-1 truncate ${selected ? "" : "font-normal text-ink-soft"}`}>{selected?.label ?? "Choose…"}</span>
-        <CaretDown size={16} weight="bold" className={`shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden />
+        <IconChevronDown width={16} className={`shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <ul ref={listRef} id={`${id}-list`} role="listbox" aria-label={ariaLabel}
-          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-3xl bg-white py-1.5 shadow-xl">
+          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-2xl border border-line bg-white py-1.5 shadow-lg">
           {options.map((o, i) => (
             <li key={o.value} id={`${id}-opt-${i}`} data-index={i} role="option" aria-selected={o.value === value}
               onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(i)}
@@ -261,7 +260,7 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
                 i === active ? "bg-cream-2" : ""
               } ${o.value === value ? "font-semibold" : ""}`}>
               <span className="min-w-0 truncate">{o.label}{o.hint && <span className="ml-2 text-xs text-ink-soft">{o.hint}</span>}</span>
-              {o.value === value && <Check size={16} weight="bold" aria-hidden />}
+              {o.value === value && <IconCheck width={16} />}
             </li>
           ))}
         </ul>
@@ -290,8 +289,8 @@ function ymd(d: Date) {
 }
 
 // Quick due-date picks that fill a date input; the input stays for any other date (brief 6.9).
-export function DuePills({ name, label }: { name: string; label: string }) {
-  const [value, setValue] = useState("");
+export function DuePills({ name, label, defaultValue = "" }: { name: string; label: string; defaultValue?: string }) {
+  const [value, setValue] = useState(defaultValue);
   const today = new Date();
   const plus = (n: number) => { const d = new Date(today); d.setDate(d.getDate() + n); return ymd(d); };
   const picks = [
@@ -307,7 +306,7 @@ export function DuePills({ name, label }: { name: string; label: string }) {
         {picks.map((p) => (
           <button key={p.label} type="button" aria-pressed={value === p.value} onClick={() => setValue(value === p.value ? "" : p.value)}
             className={`min-h-11 cursor-pointer rounded-full px-4 text-sm font-semibold transition-colors ${
-              value === p.value ? "bg-ink text-cream" : "bg-fab text-ink hover:bg-fab/70"
+              value === p.value ? "border border-ink bg-ink text-white" : "border border-line bg-white text-ink hover:bg-cream-2"
             }`}>
             {p.label}
           </button>

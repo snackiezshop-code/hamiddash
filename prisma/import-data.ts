@@ -20,7 +20,7 @@ async function main() {
   await db.additionalIncome.createMany({ data: dump.additionalIncomes });
   await db.expense.createMany({ data: dump.expenses });
   await db.transferCheck.createMany({ data: dump.transferChecks });
-  await db.checklistItem.createMany({ data: dump.checklistItems });
+  await db.reminder.createMany({ data: dump.reminders });
 
   console.log(Object.fromEntries(Object.entries(dump).map(([k, v]) => [k, (v as unknown[]).length])));
 }

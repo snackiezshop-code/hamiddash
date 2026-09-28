@@ -46,7 +46,7 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
 
   return (
     <div ref={ref} className="relative w-full max-w-md">
-      <label className="flex items-center gap-2 h-11 rounded-full border border-line bg-white px-4 focus-within:border-ink focus-within:ring-1 focus-within:ring-ink">
+      <label className="flex items-center gap-2 h-11 rounded-xl border border-line bg-white px-4 focus-within:border-ink focus-within:ring-1 focus-within:ring-ink">
         <IconSearch width={18} height={18} className="shrink-0 text-ink-soft" />
         <input
           type="search"
@@ -82,7 +82,7 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
 
       {open && query.trim() !== "" && (
         <ul id="room-search-results" role="listbox"
-          className="absolute z-40 mt-2 max-h-80 w-full overflow-y-auto rounded-3xl border border-line bg-white py-1.5 shadow-xl">
+          className="absolute z-40 mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-line bg-white py-1.5 shadow-lg">
           {results.length === 0 ? (
             <li className="px-5 py-3 text-sm text-ink-soft">No matches</li>
           ) : results.map((r, i) => (

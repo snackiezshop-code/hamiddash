@@ -8,14 +8,15 @@ import { RobotSvg, type RobotEyes } from "./robot";
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// ── Greeting robot: keeps its idle hop, and each tap plays the next of three reactions. ──
+// ── Greeting robot: sits swinging its legs, and each tap plays the next of three reactions. ──
 const REACTIONS = [
   { className: "robot-react-hop", ms: 600, eyes: null },
   { className: "robot-react-spin", ms: 600, eyes: null },
   { className: "robot-react-love", ms: 1000, eyes: "hearts" as const },
 ];
 
-export function GreetingRobot({ mood }: { mood: "morning" | "day" | "night" }) {
+// Sits on the "M" of the greeting's "Max", legs swinging. `className` places it (see the Overview header).
+export function GreetingRobot({ mood, className = "" }: { mood: "morning" | "day" | "night"; className?: string }) {
   const [taps, setTaps] = useState(0);
   const [active, setActive] = useState<(typeof REACTIONS)[number] | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -32,13 +33,11 @@ export function GreetingRobot({ mood }: { mood: "morning" | "day" | "night" }) {
   const eyes: RobotEyes = active?.eyes ?? (mood === "night" ? "sleepy" : "open");
 
   return (
-    <button type="button" onClick={react} aria-label="Say hi to the robot"
-      className="-m-1 flex h-14 w-12 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full p-1 md:h-16 md:w-16">
-      {/* key restarts the reaction animation on every tap */}
-      <span key={taps} className={`block origin-center ${active?.className ?? ""}`}>
-        <RobotSvg className="robot-bounce h-9 w-9 md:h-12 md:w-12" eyes={eyes} cup={mood === "morning"} />
+    <button type="button" onClick={react} aria-label="Say hi to the robot" className={`cursor-pointer rounded-full ${className}`}>
+      {/* key restarts the reaction animation on every tap; reactions pivot on the seat, not the middle */}
+      <span key={taps} className={`block h-full w-full ${active?.className ?? ""}`} style={{ transformOrigin: "50% 66%" }}>
+        <RobotSvg pose="sit" className="robot-sit block h-full w-full" eyes={eyes} cup={mood === "morning"} />
       </span>
-      <span className="robot-bounce-shadow h-1 w-5 rounded-full md:h-1.5 md:w-7" aria-hidden />
     </button>
   );
 }

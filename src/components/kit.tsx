@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import {
-  Broom, CaretRight, ClipboardText, DotsThreeOutline, Drop, HandCoins, Lightning,
-  Receipt, SprayBottle, Toolbox, UserGear, WifiHigh, Wrench,
-} from "@phosphor-icons/react/ssr";
-import type { Icon } from "@phosphor-icons/react";
+  IconChevronRight, IconClipboard, IconCoins, IconHuman, IconInvoice, IconMore, IconSpray, IconSprayCan,
+  IconStickyNote, IconToolCase, IconTools, IconWaves, IconWifi, IconZap, type AppIcon,
+} from "./icons";
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
 
 export type Pastel = "mint" | "blush" | "butter" | "peri";
@@ -15,12 +14,13 @@ export const PASTEL_BG: Record<Pastel, string> = {
   peri: "bg-peri",
 };
 
-// Bold two-tone glyph in a soft pastel circle (brief 6.10). Icons stay ink so they read on every pastel.
-export function IconBadge({ icon: Glyph, tone, size = 40 }: { icon: Icon; tone: Pastel; size?: number }) {
+// Pixel glyph in a soft pastel circle (brief 6.10). Icons stay ink so they read on every pastel.
+// The glyph is a multiple of 12px so its 2px pixels land on whole screen pixels.
+export function IconBadge({ icon: Glyph, tone, size = 40 }: { icon: AppIcon; tone: Pastel; size?: number }) {
   return (
     <span className={`grid shrink-0 place-items-center rounded-full text-ink ${PASTEL_BG[tone]}`}
       style={{ width: size, height: size }} aria-hidden>
-      <Glyph size={Math.round(size * 0.5)} weight="duotone" />
+      <Glyph width={Math.max(12, Math.round((size * 0.6) / 12) * 12)} />
     </span>
   );
 }
@@ -73,16 +73,16 @@ export function CountPill({ n }: { n: number }) {
 }
 
 export function Chevron() {
-  return <CaretRight size={18} weight="bold" className="shrink-0 text-ink-soft" aria-hidden />;
+  return <IconChevronRight width={16} className="shrink-0 text-ink-soft" />;
 }
 
-type CategoryMeta = { tone: Pastel; icon: Icon };
+type CategoryMeta = { tone: Pastel; icon: AppIcon };
 
 export const TASK_CATEGORIES: ({ value: string } & CategoryMeta)[] = [
-  { value: "Cleaning", tone: "mint", icon: Broom },
-  { value: "Maintenance", tone: "butter", icon: Wrench },
-  { value: "Admin", tone: "peri", icon: ClipboardText },
-  { value: "Other", tone: "blush", icon: DotsThreeOutline },
+  { value: "Cleaning", tone: "mint", icon: IconSpray },
+  { value: "Maintenance", tone: "butter", icon: IconTools },
+  { value: "Admin", tone: "peri", icon: IconClipboard },
+  { value: "Other", tone: "blush", icon: IconStickyNote },
 ];
 
 export function taskCategoryMeta(category: string | null | undefined): CategoryMeta {
@@ -91,17 +91,17 @@ export function taskCategoryMeta(category: string | null | undefined): CategoryM
   return TASK_CATEGORIES.find((c) => c.value === key) ?? TASK_CATEGORIES[3];
 }
 
-// Lightning here literally means the electricity bill, not decoration.
+// Zap literally means the electricity bill here, waves the water (PDAM) bill: not decoration.
 export const EXPENSE_META: Record<ExpenseCategory, CategoryMeta> = {
-  LISTRIK: { tone: "butter", icon: Lightning },
-  PDAM: { tone: "peri", icon: Drop },
-  CLEANING_SERVICE: { tone: "mint", icon: Broom },
-  KEBERSIHAN: { tone: "mint", icon: SprayBottle },
-  PERBAIKAN: { tone: "butter", icon: Wrench },
-  INTERNET: { tone: "peri", icon: WifiHigh },
-  PERLENGKAPAN: { tone: "butter", icon: Toolbox },
-  ADMINISTRASI: { tone: "peri", icon: Receipt },
-  PENGURUS: { tone: "mint", icon: UserGear },
-  BAGI_HASIL: { tone: "blush", icon: HandCoins },
-  LAINNYA: { tone: "blush", icon: DotsThreeOutline },
+  LISTRIK: { tone: "butter", icon: IconZap },
+  PDAM: { tone: "peri", icon: IconWaves },
+  CLEANING_SERVICE: { tone: "mint", icon: IconSpray },
+  KEBERSIHAN: { tone: "mint", icon: IconSprayCan },
+  PERBAIKAN: { tone: "butter", icon: IconTools },
+  INTERNET: { tone: "peri", icon: IconWifi },
+  PERLENGKAPAN: { tone: "butter", icon: IconToolCase },
+  ADMINISTRASI: { tone: "peri", icon: IconInvoice },
+  PENGURUS: { tone: "mint", icon: IconHuman },
+  BAGI_HASIL: { tone: "blush", icon: IconCoins },
+  LAINNYA: { tone: "blush", icon: IconMore },
 };

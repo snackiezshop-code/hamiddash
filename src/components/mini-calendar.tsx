@@ -6,7 +6,8 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-export type ReminderEntry = { day: number; roomNumber: number; name: string };
+// One dot per day with something due: a tenant's rent reminder day or one of your own reminders.
+export type ReminderEntry = { day: number; label: string };
 
 export function MiniCalendar({ reminders }: { reminders: ReminderEntry[] }) {
   // Jakarta's date, so the server render (UTC on Vercel) and the phone agree on "today".
@@ -23,34 +24,30 @@ export function MiniCalendar({ reminders }: { reminders: ReminderEntry[] }) {
   const cells = [...Array(leadingBlanks).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   return (
-    <div className="mb-4 rounded-2xl bg-white/5 p-3.5">
-      <div className="mb-2.5 flex items-center justify-between px-0.5">
-        <span className="text-xs font-semibold text-cream/80">{MONTH_NAMES[month]} {year}</span>
-        {remindersByDay.size > 0 && <span className="h-1.5 w-1.5 rounded-full bg-butter" aria-hidden />}
+    <div className="rounded-2xl bg-cream p-3.5">
+      <div className="mb-2.5 px-0.5">
+        <span className="text-xs font-semibold text-ink-soft">{MONTH_NAMES[month]} {year}</span>
       </div>
       <div className="grid grid-cols-7 gap-y-1 text-center">
         {WEEKDAYS.map((w, i) => (
-          <span key={i} className="text-[10px] font-semibold text-cream/60">{w}</span>
+          <span key={i} className="text-[10px] font-semibold text-ink-soft">{w}</span>
         ))}
         {cells.map((day, i) => {
           if (day === null) return <span key={`b${i}`} />;
           const reminders = remindersByDay.get(day);
           const isToday = day === today;
           const title = reminders?.length
-            ? reminders.map((r) => `Room ${r.roomNumber} · ${r.name}`).join(", ")
+            ? reminders.map((r) => r.label).join(", ")
             : undefined;
           return (
             <span key={day} title={title} className="relative mx-auto flex h-6 w-6 items-center justify-center">
               <span className={`num flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
-                isToday ? "bg-cream font-bold text-ink" : "text-cream/85"
+                isToday ? "bg-ink font-bold text-white" : "text-ink"
               }`}>
                 {day}
               </span>
-              {reminders && !isToday && (
-                <span className="absolute bottom-0 h-1 w-1 rounded-full bg-butter" aria-hidden />
-              )}
-              {reminders && isToday && (
-                <span className="absolute bottom-0 h-1 w-1 rounded-full bg-blush-deep" aria-hidden />
+              {reminders && (
+                <span className={`absolute -bottom-0.5 h-1 w-1 rounded-full ${isToday ? "bg-terra" : "bg-terra-strong"}`} aria-hidden />
               )}
             </span>
           );

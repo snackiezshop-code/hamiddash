@@ -9,8 +9,11 @@ import { SESSION_COOKIE, SESSION_DAYS, createToken, timingSafeEqual } from "@/li
 import { createPeriod, isLatestPeriod, recarryBalances } from "@/lib/cashbook";
 import { sendPushToAll } from "@/lib/push";
 import { dueReminders } from "@/lib/reminders";
-import { CATEGORY_OPTIONS, STATUS_OPTIONS, isFuturePeriod, parseAmount, periodSlug } from "@/lib/format";
-import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
+import {
+  CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, todayJakarta,
+} from "@/lib/format";
+import { REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
+import type { ExpenseCategory, Repeat, RoomStatus } from "@/generated/prisma/enums";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const optStr = (f: FormData, k: string) => str(f, k) || null;
@@ -213,6 +216,22 @@ export async function addExpense(form: FormData) {
   refresh();
 }
 
+// Returns an error message for the sheet to show, or undefined on success.
+export async function updateExpense(form: FormData) {
+  await requireAdmin();
+  const category = str(form, "category") as ExpenseCategory;
+  if (!CATEGORY_OPTIONS.includes(category)) return "Choose a category.";
+  const amount = parseAmount(form.get("amount"));
+  if (amount <= 0) return "Enter an amount above 0.";
+  const row = await db.expense.update({
+    where: { id: str(form, "id") },
+    data: { category, description: str(form, "description") || "-", amount },
+    include: { period: true },
+  });
+  await recarryBalances(row.period.year, row.period.month);
+  refresh();
+}
+
 export async function deleteExpense(form: FormData) {
   await requireAdmin();
   const row = await db.expense.delete({ where: { id: str(form, "id") }, include: { period: true } });
@@ -230,36 +249,84 @@ export async function toggleTransfer(form: FormData) {
   refresh();
 }
 
-// ---------- Checklist ----------
+// ---------- Reminders (bills, repairs, admin) ----------
 
-export async function addChecklistItem(form: FormData) {
+function reminderData(form: FormData) {
+  const repeat = str(form, "repeat") as Repeat;
+  const amount = parseAmount(form.get("amount"));
+  const category = str(form, "category") as ExpenseCategory;
+  return {
+    title: str(form, "title"),
+    tag: optStr(form, "tag"),
+    roomId: optStr(form, "roomId"),
+    dueDate: optDate(form, "dueDate"),
+    repeat: REPEAT_OPTIONS.includes(repeat) ? repeat : "NONE",
+    amount: amount > 0 ? amount : null,
+    category: amount > 0 ? (CATEGORY_OPTIONS.includes(category) ? category : "LAINNYA") : null,
+  } as const;
+}
+
+function reminderError(data: ReturnType<typeof reminderData>) {
+  if (!data.title) return "Enter what to remember.";
+  if (data.dueDate && Number.isNaN(data.dueDate.getTime())) return "Pick a valid date.";
+  if (data.repeat !== "NONE" && !data.dueDate) return "A repeating reminder needs a date to start from.";
+}
+
+// These return an error message for the sheet to show, or undefined on success.
+export async function addReminder(form: FormData) {
   await requireAdmin();
-  const title = str(form, "title");
-  if (!title) return;
-  await db.checklistItem.create({
-    data: {
-      title,
-      category: optStr(form, "category"),
-      dueDate: optDate(form, "dueDate"),
-      roomId: optStr(form, "roomId"),
-    },
-  });
+  const data = reminderData(form);
+  const error = reminderError(data);
+  if (error) return error;
+  await db.reminder.create({ data });
   refresh();
 }
 
-export async function toggleChecklistItem(form: FormData) {
+export async function updateReminder(form: FormData) {
   await requireAdmin();
-  const item = await db.checklistItem.findUniqueOrThrow({ where: { id: str(form, "id") } });
-  await db.checklistItem.update({
-    where: { id: item.id },
-    data: { isDone: !item.isDone, completedAt: item.isDone ? null : new Date() },
-  });
+  const data = reminderData(form);
+  const error = reminderError(data);
+  if (error) return error;
+  await db.reminder.update({ where: { id: str(form, "id") }, data });
   refresh();
 }
 
-export async function deleteChecklistItem(form: FormData) {
+// Done (or Paid, for a bill). A bill records its expense in this month's cash book first; a repeating
+// reminder then moves on to its next date, a one-off one is ticked off.
+export async function completeReminder(_prev: string | null | undefined, form: FormData) {
   await requireAdmin();
-  await db.checklistItem.delete({ where: { id: str(form, "id") } });
+  const r = await db.reminder.findUniqueOrThrow({ where: { id: str(form, "id") } });
+  if (r.amount) {
+    const today = todayJakarta();
+    const year = today.getUTCFullYear();
+    const month = today.getUTCMonth() + 1;
+    const period = await db.cashPeriod.findUnique({ where: { year_month: { year, month } } });
+    if (!period) return `Start the ${periodLabel(year, month)} cash book first.`;
+    await db.expense.create({
+      data: {
+        periodId: period.id, category: r.category ?? "LAINNYA", amount: r.amount,
+        description: r.dueDate ? `${r.title} · due ${formatDate(r.dueDate)}` : r.title,
+      },
+    });
+    await recarryBalances(year, month);
+  }
+  if (r.repeat !== "NONE" && r.dueDate) {
+    await db.reminder.update({ where: { id: r.id }, data: { dueDate: nextDueDate(r.dueDate, r.repeat), doneAt: new Date() } });
+  } else {
+    await db.reminder.update({ where: { id: r.id }, data: { isDone: true, doneAt: new Date() } });
+  }
+  refresh();
+}
+
+export async function reopenReminder(form: FormData) {
+  await requireAdmin();
+  await db.reminder.update({ where: { id: str(form, "id") }, data: { isDone: false, doneAt: null } });
+  refresh();
+}
+
+export async function deleteReminder(form: FormData) {
+  await requireAdmin();
+  await db.reminder.delete({ where: { id: str(form, "id") } });
   refresh();
 }
 
@@ -324,7 +391,7 @@ export async function sendTestPush() {
     title: "Reminder alerts are on",
     body: due.length
       ? `${due.length} reminder${due.length > 1 ? "s" : ""} due right now. Tap to open them.`
-      : "You'll get an alert here at 09:00 when rent is due in 3 days, due today, or overdue.",
+      : "You'll get an alert here at 09:00 when rent or a reminder is due soon, due today, or overdue.",
     url: "/pengingat",
   });
 }

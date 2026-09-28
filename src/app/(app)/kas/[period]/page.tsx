@@ -3,22 +3,23 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getPeriod, summarize } from "@/lib/cashbook";
 import {
-  CATEGORY_LABEL, STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
+  STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
   isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, reminderText, rupiah, shiftMonth,
 } from "@/lib/format";
 import {
-  addAdditionalIncome, deleteAdditionalIncome, deleteExpense, startPeriod, toggleTransfer, updateRoomIncome,
+  addAdditionalIncome, deleteAdditionalIncome, startPeriod, toggleTransfer, updateRoomIncome,
 } from "@/app/actions";
 import { Empty, PageHeader, Section, StatCard, WaButton } from "@/components/ui";
 import { BankAccount } from "@/components/bank";
 import { AmountInput, AutoSubmitAmount, ConfirmButton, SubmitButton } from "@/components/forms";
-import { Avatar, CountPill, IconBadge, ListRow, EXPENSE_META, STATUS_PASTEL } from "@/components/kit";
+import { Avatar, CountPill, STATUS_PASTEL } from "@/components/kit";
+import { ExpenseList } from "@/components/expense-list";
 import { SegmentedLinks, SelectPill, SwitchSubmit } from "@/components/kit-client";
 import { MonthSelect } from "@/components/month-select";
 import { QuickAddButton } from "@/components/quick-add";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
 import {
-  IconAlert, IconCheck, IconChevronLeft, IconChevronRight, IconDownload, IconPlus, IconTrash, IconWallet,
+  IconCheck, IconReceipt, IconChevronLeft, IconChevronRight, IconDownload, IconPlus, IconTrash, IconWallet,
 } from "@/components/icons";
 
 const TABS = [
@@ -57,7 +58,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
   const nav = (
     <>
       <div className="flex w-full md:hidden">
-        <MonthSelect options={monthOptions} value={slug} tab={tab} />
+        <MonthSelect options={monthOptions} value={slug} hrefTemplate={`/kas/:month?tab=${tab}`} />
       </div>
       <div className="hidden items-center gap-1 md:flex">
         <Link href={`/kas/${periodSlug(prev.year, prev.month)}`} className="btn-secondary btn-sm" aria-label="Previous month">
@@ -123,10 +124,10 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
           footer={<span className="text-ink-soft">Closing balance of {periodLabel(prev.year, prev.month)}</span>} />
         <StatCard tone="mint" icon={<IconCheck />} label="Income" value={rupiah(s.incomeTotal)}
           footer={`Rent ${rupiah(s.roomTotal)} · other ${rupiah(s.additionalTotal)}`} />
-        <StatCard tone="blush" icon={<IconAlert />} label="Expenses" value={rupiah(s.expenseTotal)}
+        <StatCard tone="blush" icon={<IconReceipt />} label="Expenses" value={rupiah(s.expenseTotal)}
           footer={`${period.expenses.length} ${period.expenses.length === 1 ? "transaction" : "transactions"}`} />
         <StatCard tone="ink" icon={<IconWallet />} label="Closing balance" value={rupiah(s.closingBalance)}
-          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-terra-strong text-[#F6F1E5]"}`}>
+          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
             Net cash flow {s.netFlow >= 0 ? "+" : ""}{rupiah(s.netFlow)}
           </span>} />
       </div>
@@ -156,7 +157,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                         <WaButton iconOnly phone={tenant?.phone} label={`Remind ${tenant?.name ?? "tenant"} on WhatsApp`}
                           text={reminderText({ name: tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year, month, dueDay: tenant?.reminderDay ?? null })} />
                       )}
-                      <label className="flex min-h-11 flex-1 items-center rounded-full bg-cream-2 px-4 focus-within:ring-2 focus-within:ring-ink sm:flex-none">
+                      <label className="flex min-h-11 flex-1 items-center rounded-xl border border-line bg-white px-4 focus-within:ring-2 focus-within:ring-ink sm:flex-none">
                         <span className="mr-1 text-xs text-ink-soft">Rp</span>
                         <AutoSubmitAmount name="amount" defaultValue={inc.amount} aria-label={`Amount for room ${inc.room.number}`}
                           className="num w-full min-w-0 bg-transparent text-right text-sm outline-none! sm:w-24" />
@@ -179,32 +180,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
               <IconPlus width={16} height={16} /> Add expense
             </QuickAddButton>}>
             {period.expenses.length === 0 ? <Empty>No expenses yet.</Empty> : (
-              <ul className="divide-y divide-line">
-                {period.expenses.map((e) => {
-                  const meta = EXPENSE_META[e.category];
-                  const title = e.description && e.description !== "-" ? e.description : CATEGORY_LABEL[e.category];
-                  return (
-                    <li key={e.id}>
-                      <ListRow
-                        leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
-                        title={title}
-                        subtitle={title === CATEGORY_LABEL[e.category] ? undefined : CATEGORY_LABEL[e.category]}
-                        trailing={
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className="num text-sm font-semibold">{rupiah(e.amount)}</span>
-                            <form action={deleteExpense}>
-                              <input type="hidden" name="id" value={e.id} />
-                              <ConfirmButton message={`Delete expense "${title}"?`} aria-label={`Delete expense ${title}`}
-                                className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-terra-strong hover:text-[#F6F1E5]">
-                                <IconTrash width={18} height={18} />
-                              </ConfirmButton>
-                            </form>
-                          </div>
-                        } />
-                    </li>
-                  );
-                })}
-              </ul>
+              <ExpenseList expenses={period.expenses} periodLabel={label} editable />
             )}
             <div className="mt-3 flex justify-between rounded-2xl bg-cream px-4 py-3 text-sm font-semibold">
               <span>Total expenses</span>
@@ -248,7 +224,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                     <form action={deleteAdditionalIncome}>
                       <input type="hidden" name="id" value={a.id} />
                       <ConfirmButton message={`Delete "${a.description}"?`} aria-label={`Delete ${a.description}`}
-                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-terra-strong hover:text-[#F6F1E5]">
+                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
                         <IconTrash width={18} height={18} />
                       </ConfirmButton>
                     </form>
@@ -273,7 +249,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
             ) : (
               <ul className="space-y-2">
                 {transfers.map((t) => (
-                  <li key={t.id} className={`rounded-3xl py-1 pr-3 pl-1 ${
+                  <li key={t.id} className={`rounded-2xl py-1 pr-3 pl-1 ${
                     t.isSent ? "bg-mint" : t.due.kind === "turn" ? "bg-butter" : isDue(t.due) ? "bg-cream" : "border border-dashed border-line"
                   }`}>
                     <div className="flex items-center gap-2">

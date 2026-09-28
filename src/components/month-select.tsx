@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CalendarBlank } from "@phosphor-icons/react";
+import { IconCalendar } from "./icons";
 import { SelectPill, type SelectOption } from "./kit-client";
 
-export function MonthSelect({ options, value, tab }: { options: SelectOption[]; value: string; tab: string }) {
+// hrefTemplate: where a picked month goes, with ":month" standing for its slug (e.g. "/kas/:month?tab=rent").
+export function MonthSelect({ options, value, hrefTemplate }: { options: SelectOption[]; value: string; hrefTemplate: string }) {
   const router = useRouter();
   return (
-    <SelectPill key={value} ariaLabel="Month" icon={CalendarBlank} options={options} defaultValue={value}
+    <SelectPill key={value} ariaLabel="Month" icon={IconCalendar} options={options} defaultValue={value}
       className="min-w-48 flex-1"
-      onChange={(v) => router.push(`/kas/${v}?tab=${tab}`, { scroll: false })} />
+      onChange={(v) => router.push(hrefTemplate.replace(":month", v), { scroll: false })} />
   );
 }

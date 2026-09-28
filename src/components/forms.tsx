@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
-import { X } from "@phosphor-icons/react";
+import { IconClose } from "./icons";
 
 export function SubmitButton({ children, className = "btn-primary", pendingText, ...rest }: ComponentProps<"button"> & { pendingText?: string }) {
   const { pending } = useFormStatus();
@@ -123,7 +123,7 @@ export function ConfirmButton({ message, children, className, confirmText = "Del
         {!pending && (
           <button type="button" aria-label="Cancel" title="Cancel" onClick={() => setArmed(false)}
             className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-cream-2 hover:text-ink md:h-9 md:w-9">
-            <X size={16} weight="bold" aria-hidden />
+            <IconClose width={16} />
           </button>
         )}
       </span>

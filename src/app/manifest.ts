@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Hamid",
     start_url: "/",
     display: "standalone",
-    background_color: "#F6F1E5",
-    theme_color: "#17140f",
+    background_color: "#FFFFFF",
+    theme_color: "#ffffff",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };
 }

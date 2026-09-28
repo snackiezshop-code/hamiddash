@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { createContext, useContext, useState, type ComponentProps, type ReactNode } from "react";
-import { DoorOpen, PencilSimple } from "@phosphor-icons/react";
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { checkoutTenant } from "@/app/actions";
 import { STATUS_LABEL, formatDate, periodLabel, rupiah } from "@/lib/format";
 import { Avatar, Chevron, IconBadge, ListRow, PASTEL_BG, STATUS_PASTEL } from "./kit";
 import { Sheet } from "./kit-client";
 import { ConfirmButton } from "./forms";
+import { IconBed, IconEdit } from "./icons";
 import { useQuickAdd } from "./quick-add";
 import { StatusPill, WaButton } from "./ui";
 
@@ -83,7 +83,7 @@ function RoomsMobileRows({ rooms }: { rooms: DrawerRoom[] }) {
           <button type="button" onClick={() => openRoom(r.number)} className="block w-full cursor-pointer text-left"
             aria-label={`Room ${r.number}${r.tenant ? `, ${r.tenant.name}` : ", no tenant"}, ${STATUS_LABEL[r.status]}. Open details`}>
             <ListRow
-              leading={r.tenant ? <Avatar name={r.tenant.name} tone={STATUS_PASTEL[r.status]} /> : <IconBadge icon={DoorOpen} tone={STATUS_PASTEL[r.status]} />}
+              leading={r.tenant ? <Avatar name={r.tenant.name} tone={STATUS_PASTEL[r.status]} /> : <IconBadge icon={IconBed} tone={STATUS_PASTEL[r.status]} />}
               title={`Room ${r.number} · ${r.tenant?.name ?? "No tenant"}`}
               subtitle={<><span className="num">{rupiah(r.monthlyRent)}</span> · {STATUS_LABEL[r.status]}</>}
               trailing={<Chevron />} />
@@ -111,7 +111,7 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
   const editLink = room && (
     <Link href={`/kamar/${room.number}`} aria-label={`Edit room ${room.number}`}
       className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-cream hover:bg-ink/85">
-      <PencilSimple size={18} weight="bold" aria-hidden />
+      <IconEdit width={24} />
     </Link>
   );
 
@@ -121,7 +121,7 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="relative shrink-0">
-              {t ? <Avatar name={t.name} tone={tone} size={72} /> : <IconBadge icon={DoorOpen} tone={tone} size={72} />}
+              {t ? <Avatar name={t.name} tone={tone} size={72} /> : <IconBadge icon={IconBed} tone={tone} size={72} />}
               <span className={`absolute -right-1 -bottom-1 h-6 w-6 rounded-full border-4 border-cream ${PASTEL_BG[tone]}`} aria-hidden />
             </div>
             <div className="min-w-0">
@@ -151,7 +151,7 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
                 <WaButton phone={t.phone} label={`Chat ${t.name}`} />
               </div>
 
-              {t.notes && <p className="rounded-3xl bg-white px-4 py-3 text-sm break-words whitespace-pre-line">{t.notes}</p>}
+              {t.notes && <p className="rounded-2xl bg-white px-4 py-3 text-sm break-words whitespace-pre-line">{t.notes}</p>}
             </>
           ) : (
             <button type="button" className="btn-primary" onClick={() => { onClose(); open("tenant", { roomId: room.id }); }}>
@@ -159,7 +159,7 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
             </button>
           )}
 
-          <section aria-labelledby="drawer-history" className="rounded-3xl bg-white px-4 py-3">
+          <section aria-labelledby="drawer-history" className="rounded-2xl bg-white px-4 py-3">
             <h3 id="drawer-history" className="mb-1 font-display text-base font-bold">Payment history</h3>
             {room.history.length === 0 ? (
               <p className="py-3 text-sm text-ink-soft">No payments recorded yet.</p>
@@ -179,7 +179,7 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
           </section>
 
           {t && (
-            <form action={checkoutTenant} className="flex items-center justify-between gap-3 rounded-3xl bg-cream-2 px-4 py-3">
+            <form action={checkoutTenant} className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-line px-4 py-3">
               <input type="hidden" name="roomId" value={room.id} />
               <span className="text-sm">
                 <span className="block font-semibold">Check out {t.name}</span>

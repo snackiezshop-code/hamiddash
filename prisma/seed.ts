@@ -120,10 +120,10 @@ async function main() {
     },
   });
 
-  await prisma.checklistItem.createMany({
+  await prisma.reminder.createMany({
     data: [
-      { title: "Perbaiki Kamar 1 (status Rusak)", category: "Perawatan", roomId: roomIds.get(1) },
-      { title: "Cari penyewa Kamar 13", category: "Admin", roomId: roomIds.get(13) },
+      { title: "Perbaiki Kamar 1 (status Rusak)", tag: "Maintenance", roomId: roomIds.get(1) },
+      { title: "Cari penyewa Kamar 13", tag: "Admin", roomId: roomIds.get(13) },
     ],
   });
 
