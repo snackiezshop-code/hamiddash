@@ -10,7 +10,7 @@ import { createPeriod, isLatestPeriod, recarryBalances } from "@/lib/cashbook";
 import { sendPushToAll } from "@/lib/push";
 import { dueReminders } from "@/lib/reminders";
 import {
-  CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, todayJakarta,
+  CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, properName, todayJakarta,
 } from "@/lib/format";
 import { PROMISE_TAG, REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
 import type { ExpenseCategory, Repeat, RoomStatus } from "@/generated/prisma/enums";
@@ -329,7 +329,7 @@ export async function savePaymentPromise(form: FormData) {
   const date = optDate(form, "date");
   if (!date || Number.isNaN(date.getTime())) return "Pilih tanggal janji bayar.";
   if (date < todayJakarta()) return "Tanggal janji tidak boleh sebelum hari ini.";
-  const title = `Janji bayar · ${room.tenant?.name ?? "Penghuni"} · Kamar ${room.number}`;
+  const title = `Janji bayar · ${room.tenant ? properName(room.tenant.name) : "Penghuni"} · Kamar ${room.number}`;
   const open = await db.reminder.findFirst({ where: { tag: PROMISE_TAG, roomId: room.id, isDone: false } });
   if (open) {
     await db.reminder.update({ where: { id: open.id }, data: { dueDate: date, title } });
