@@ -16,9 +16,9 @@ export type Notification = {
 };
 
 const DOT: Record<Notification["tone"], string> = {
-  blush: "bg-blush-deep",
+  blush: "bg-orange",
   butter: "bg-butter-deep",
-  peri: "bg-peri-deep",
+  peri: "bg-navy",
 };
 
 export function NotificationBell({ notifications }: { notifications: Notification[] }) {
@@ -43,41 +43,41 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
   }, [open]);
 
   return (
-    // Phones anchor the panel to the positioned parent row (the settings button sits to the bell's right).
-    <div ref={ref} className="md:relative">
+    // The panel anchors to the header row (positioned), so it stays on screen on phones.
+    <div ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label={count ? `Notifications (${count})` : "Notifications"}
+        aria-label={count ? `Notifikasi (${count})` : "Notifikasi"}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-white transition-colors hover:bg-cream-2"
+        className="press relative grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-[4px] border-[1.5px] border-ink bg-card shadow-[2px_2px_0_var(--color-ink)] hover:bg-cream"
       >
         <IconBell width={20} height={20} />
         {count > 0 && (
-          <span className="num absolute -top-1.5 -right-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-blush-deep px-1 text-[10px] font-semibold text-white">
+          <span className="num absolute -top-2 -right-2 grid h-[18px] min-w-[18px] place-items-center rounded-[3px] border border-ink bg-orange px-1 text-[10px] font-semibold text-white">
             {count > 9 ? "9+" : count}
           </span>
         )}
       </button>
 
       {open && (
-        <div role="dialog" aria-label="Notifications"
-          className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <span className="h-display text-base">Notifications</span>
-            {count > 0 && <span className="pill bg-cream">{count}</span>}
+        <div role="dialog" aria-label="Notifikasi"
+          className="absolute right-0 z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[4px] border-[1.5px] border-ink bg-card shadow-[5px_5px_0_var(--color-ink)]">
+          <div className="flex items-center justify-between border-b-[1.5px] border-ink px-4 py-3">
+            <span className="eyebrow">Notifikasi</span>
+            {count > 0 && <span className="eyebrow num text-ink-soft">{String(count).padStart(2, "0")}</span>}
           </div>
           {count === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-ink-soft">You&apos;re all caught up.</p>
+            <p className="px-4 py-8 text-center text-sm text-ink-soft">Tidak ada yang perlu diurus.</p>
           ) : (
             <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto">
               {notifications.map((n) => (
                 <li key={n.id}>
                   <NotificationLink n={n} onClick={() => setOpen(false)}>
-                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${DOT[n.tone]}`} aria-hidden />
+                    <span className={`mt-1.5 h-2 w-2 shrink-0 ${DOT[n.tone]}`} aria-hidden />
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{n.title}</span>
+                      <span className="block text-sm font-medium">{n.title}</span>
                       <span className="block text-xs text-ink-soft">{n.detail}</span>
                     </span>
                   </NotificationLink>
@@ -92,7 +92,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
 }
 
 function NotificationLink({ n, onClick, children }: { n: Notification; onClick: () => void; children: React.ReactNode }) {
-  const className = "flex items-start gap-3 px-5 py-3 hover:bg-cream/60";
+  const className = "flex items-start gap-3 px-4 py-3 hover:bg-cream";
   if (n.external) {
     return <a href={n.href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>{children}</a>;
   }

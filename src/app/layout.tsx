@@ -1,26 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Gelasio, VT323 } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-// Gelasio for headings and the wordmark; VT323, a pixel font, for everything else (it matches the
-// pixel logo, icons and robot).
-const gelasio = Gelasio({ variable: "--font-gelasio", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const vt323 = VT323({ variable: "--font-vt323", subsets: ["latin"], weight: "400" });
+// Space Grotesk for everything: squared grotesk shapes that suit the outlined-card look, with
+// tabular figures for rupiah columns.
+const space = Space_Grotesk({ variable: "--font-space", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "Hamid",
-  description: "Management dashboard for Kost Mujair 12",
+  title: "HamidKost",
+  description: "Dasbor pengelolaan Kost Mujair 12",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#ECE7DD",
   // Lets env(safe-area-inset-*) report the notch/home-indicator insets; gutters use them (safe-gutter).
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${vt323.variable} ${gelasio.variable} h-full antialiased`}>
+    <html lang="id" className={`${space.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

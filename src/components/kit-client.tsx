@@ -7,15 +7,14 @@ import { useFormStatus } from "react-dom";
 import { IconCheck, IconChevronDown, IconClose, type AppIcon } from "./icons";
 import { errorDetails, reportClientIssue } from "@/lib/client-log";
 
-// Soft tint = secondary (close/back), solid ink = primary (confirm/add). Dashed outlines are
-// reserved for "pending / not yet" (unchecked tasks, future transfer turns).
+// Square outlined buttons for sheet headers: card = secondary (close/back), navy = primary (confirm).
 export function HeaderButton({ variant, className = "", children, ...rest }: ComponentProps<"button"> & { variant: "soft" | "solid" }) {
   return (
     <button type="button" {...rest}
-      className={`grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full transition-colors disabled:opacity-50 ${
+      className={`press grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-[4px] border-[1.5px] border-ink shadow-[2px_2px_0_var(--color-ink)] disabled:opacity-50 ${
         variant === "soft"
-          ? "bg-ink/[0.07] text-ink hover:bg-ink/15"
-          : "bg-ink text-cream hover:bg-ink/85"
+          ? "bg-card text-ink hover:bg-cream"
+          : "bg-navy text-white hover:bg-navy-hover"
       } ${className}`}>
       {children}
     </button>
@@ -25,9 +24,9 @@ export function HeaderButton({ variant, className = "", children, ...rest }: Com
 function SubmitCircle({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <HeaderButton variant="solid" type="submit" disabled={pending} aria-label={pending ? "Saving" : label}>
-      {pending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-cream/40 border-t-cream" aria-hidden />
-        : <IconCheck width={24} />}
+    <HeaderButton variant="solid" type="submit" disabled={pending} aria-label={pending ? "Menyimpan" : label}>
+      {pending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />
+        : <IconCheck width={22} />}
     </HeaderButton>
   );
 }
@@ -76,9 +75,9 @@ export function Sheet({ open, onClose, title, children, headerRight }: {
 
   return (
     <dialog {...dialog} aria-labelledby={titleId}
-      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[24px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[24px]">
+      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[8px] border-t-[1.5px] border-ink bg-card p-0 text-ink backdrop:bg-ink/50 md:inset-0 md:m-auto md:max-w-lg md:rounded-[4px] md:border-[1.5px] md:shadow-[6px_6px_0_var(--color-ink)]">
       <div className="px-5 pt-4" style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
-        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
+        <div className="mx-auto mb-3 h-1 w-10 bg-ink/25 md:hidden" aria-hidden />
         <SheetHeader titleId={titleId} title={title} onClose={onClose} right={headerRight} />
         {children}
       </div>
@@ -89,10 +88,10 @@ export function Sheet({ open, onClose, title, children, headerRight }: {
 function SheetHeader({ titleId, title, onClose, right }: { titleId: string; title: string; onClose: () => void; right?: ReactNode }) {
   return (
     <div className="mb-4 flex items-center gap-3">
-      <HeaderButton variant="soft" onClick={onClose} aria-label="Close">
-        <IconClose width={24} />
+      <HeaderButton variant="soft" onClick={onClose} aria-label="Tutup">
+        <IconClose width={22} />
       </HeaderButton>
-      <h2 id={titleId} className="min-w-0 flex-1 truncate text-center font-display text-lg font-bold">{title}</h2>
+      <h2 id={titleId} className="h-display min-w-0 flex-1 truncate text-center text-lg">{title}</h2>
       {right ?? <span className="h-11 w-11 shrink-0" aria-hidden />}
     </div>
   );
@@ -114,7 +113,7 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
 
   return (
     <dialog {...dialog} aria-labelledby={titleId}
-      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[24px] bg-cream p-0 text-ink backdrop:bg-ink/45 md:inset-0 md:m-auto md:max-w-lg md:rounded-[24px]">
+      className="sheet fixed inset-x-0 top-auto bottom-0 m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[8px] border-t-[1.5px] border-ink bg-card p-0 text-ink backdrop:bg-ink/50 md:inset-0 md:m-auto md:max-w-lg md:rounded-[4px] md:border-[1.5px] md:shadow-[6px_6px_0_var(--color-ink)]">
       {open && (
         <form
           className="px-5 pt-4"
@@ -127,13 +126,13 @@ export function FormSheet({ open, onClose, title, submitLabel, action, children,
               else onClose();
             } catch (err) {
               reportClientIssue("form-save-failed", { form: title, ...errorDetails(err) });
-              setError("Couldn't save. Check your connection and try again.");
+              setError("Gagal menyimpan. Periksa koneksi, lalu coba lagi.");
             }
           }}>
-          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-ink/15 md:hidden" aria-hidden />
+          <div className="mx-auto mb-3 h-1 w-10 bg-ink/25 md:hidden" aria-hidden />
           <SheetHeader titleId={titleId} title={title} onClose={onClose} right={canSubmit ? <SubmitCircle label={submitLabel} /> : undefined} />
           <div className="flex flex-col gap-4">{children}</div>
-          {error && <p role="alert" className="mt-4 rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+          {error && <p role="alert" className="mt-4 rounded-[4px] border-[1.5px] border-blush-deep bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
           {canSubmit && <SubmitWide label={submitLabel} />}
         </form>
       )}
@@ -145,16 +144,16 @@ function SubmitWide({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending} className="btn-primary mt-5 w-full">
-      {pending ? "Saving…" : label}
+      {pending ? "Menyimpan…" : label}
     </button>
   );
 }
 
 export type SelectOption = { value: string; label: string; hint?: string };
 
-// Pill dropdown replacing native <select> (brief 6.7). Listbox pattern: arrows, Home/End, Enter/Space, Escape, type-ahead.
+// Outlined dropdown replacing native <select>. Listbox pattern: arrows, Home/End, Enter/Space, Escape, type-ahead.
 // `required`: starts with nothing chosen and blocks the form's submit until an option is picked.
-export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, ariaLabel, icon: Glyph, className = "", tone = "border border-line bg-white", disabled, required, requiredMessage = "Choose an option" }: {
+export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, ariaLabel, icon: Glyph, className = "", tone = "border-[1.5px] border-ink bg-card", disabled, required, requiredMessage = "Pilih salah satu" }: {
   name?: string;
   options: SelectOption[];
   defaultValue?: string;
@@ -241,23 +240,23 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
           onInvalid={(e) => { e.preventDefault(); setInvalid(true); buttonRef.current?.focus(); }} />
       )}
       <button ref={buttonRef} type="button" role="combobox" disabled={disabled || pending}
-        aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`} aria-label={`${ariaLabel}: ${selected?.label ?? "none"}`}
+        aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`} aria-label={`${ariaLabel}: ${selected?.label ?? "belum dipilih"}`}
         aria-activedescendant={open ? `${id}-opt-${active}` : undefined}
         aria-invalid={invalid || undefined} aria-describedby={invalid ? `${id}-err` : undefined}
         onClick={() => (open ? setOpen(false) : openList())} onKeyDown={onKeyDown}
-        className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold disabled:opacity-60 ${tone} ${invalid ? "ring-2 ring-blush-deep" : ""}`}>
+        className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[4px] px-3.5 text-left text-sm font-medium disabled:opacity-60 ${tone} ${invalid ? "ring-2 ring-blush-deep" : ""}`}>
         {Glyph && <Glyph width={24} className="shrink-0" />}
-        <span className={`min-w-0 flex-1 truncate ${selected ? "" : "font-normal text-ink-soft"}`}>{selected?.label ?? "Choose…"}</span>
+        <span className={`min-w-0 flex-1 truncate ${selected ? "" : "font-normal text-ink-soft"}`}>{selected?.label ?? "Pilih…"}</span>
         <IconChevronDown width={16} className={`shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <ul ref={listRef} id={`${id}-list`} role="listbox" aria-label={ariaLabel}
-          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-2xl border border-line bg-white py-1.5 shadow-lg">
+          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-[4px] border-[1.5px] border-ink bg-card py-1 shadow-[4px_4px_0_var(--color-ink)]">
           {options.map((o, i) => (
             <li key={o.value} id={`${id}-opt-${i}`} data-index={i} role="option" aria-selected={o.value === value}
               onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(i)}
               className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 text-sm whitespace-nowrap ${
-                i === active ? "bg-cream-2" : ""
+                i === active ? "bg-cream" : ""
               } ${o.value === value ? "font-semibold" : ""}`}>
               <span className="min-w-0 truncate">{o.label}{o.hint && <span className="ml-2 text-xs text-ink-soft">{o.hint}</span>}</span>
               {o.value === value && <IconCheck width={16} />}
@@ -270,15 +269,15 @@ export function SelectPill({ name, options, defaultValue, onChange, autoSubmit, 
   );
 }
 
-// Black track, white knob (brief 6.8). Submits its form; flips optimistically while saving.
+// Navy track when on, grey when off, white knob. Submits its form; flips optimistically while saving.
 export function SwitchSubmit({ checked, label }: { checked: boolean; label: string }) {
   const { pending } = useFormStatus();
   const on = pending ? !checked : checked;
   return (
     <button type="submit" role="switch" aria-checked={on} aria-label={label} disabled={pending}
       className="grid min-h-11 min-w-11 shrink-0 cursor-pointer place-items-center">
-      <span className={`relative block h-7 w-12 rounded-full transition-colors ${on ? "bg-ink" : "bg-track"}`}>
-        <span className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white transition-transform ${on ? "translate-x-5" : ""}`} />
+      <span className={`relative block h-7 w-12 rounded-[4px] border-[1.5px] border-ink transition-colors ${on ? "bg-navy" : "bg-track"}`}>
+        <span className={`absolute top-[3px] left-[3px] h-[19px] w-[19px] rounded-[2px] bg-white transition-transform ${on ? "translate-x-5" : ""}`} />
       </span>
     </button>
   );
@@ -294,25 +293,25 @@ export function DuePills({ name, label, defaultValue = "" }: { name: string; lab
   const today = new Date();
   const plus = (n: number) => { const d = new Date(today); d.setDate(d.getDate() + n); return ymd(d); };
   const picks = [
-    { label: "Today", value: ymd(today) },
-    { label: "Tomorrow", value: plus(1) },
-    { label: "In 3 days", value: plus(3) },
-    { label: "This week", value: plus((7 - today.getDay()) % 7) },
+    { label: "Hari ini", value: ymd(today) },
+    { label: "Besok", value: plus(1) },
+    { label: "3 hari lagi", value: plus(3) },
+    { label: "Minggu ini", value: plus((7 - today.getDay()) % 7) },
   ];
   return (
     <div>
       <span className="label">{label}</span>
-      <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label={`${label} quick picks`}>
+      <div className="mb-2 flex flex-wrap gap-2" role="group" aria-label={`Pilihan cepat ${label.toLowerCase()}`}>
         {picks.map((p) => (
           <button key={p.label} type="button" aria-pressed={value === p.value} onClick={() => setValue(value === p.value ? "" : p.value)}
-            className={`min-h-11 cursor-pointer rounded-full px-4 text-sm font-semibold transition-colors ${
-              value === p.value ? "border border-ink bg-ink text-white" : "border border-line bg-white text-ink hover:bg-cream-2"
+            className={`min-h-11 cursor-pointer rounded-[4px] border-[1.5px] border-ink px-3.5 text-sm font-medium transition-colors ${
+              value === p.value ? "bg-navy text-white" : "bg-card text-ink hover:bg-cream"
             }`}>
             {p.label}
           </button>
         ))}
       </div>
-      <input type="date" name={name} value={value} onChange={(e) => setValue(e.target.value)} aria-label={`${label} date`} className="field num" />
+      <input type="date" name={name} value={value} onChange={(e) => setValue(e.target.value)} aria-label={`Tanggal ${label.toLowerCase()}`} className="field num" />
     </div>
   );
 }
@@ -326,7 +325,7 @@ export function Field({ label, htmlFor, children }: { label: string; htmlFor?: s
   );
 }
 
-// Solid ink pill for the selected tab, plain text for the rest (brief 6.4).
+// An outlined tab strip: the selected tab is filled navy.
 // The pill jumps to a tapped tab at once; these links only change the query string, so the
 // route's loading skeleton never shows and the server round trip would otherwise look like no response.
 export function SegmentedLinks({ label, items }: { label: string; items: { href: string; label: string; active: boolean }[] }) {
@@ -337,16 +336,16 @@ export function SegmentedLinks({ label, items }: { label: string; items: { href:
   const tapped = tap && tap.from === here ? tap.href : null;
 
   return (
-    <nav aria-label={label} className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <ul className="flex w-max sm:gap-1">
+    <nav aria-label={label} className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul className="flex w-max min-w-full rounded-[4px] border-[1.5px] border-ink bg-card p-[3px]">
         {items.map((it) => {
           const active = tapped ? tapped === it.href : it.active;
           return (
-            <li key={it.href}>
+            <li key={it.href} className="flex-1">
               <Link href={it.href} scroll={false} aria-current={active ? "page" : undefined}
                 onClick={(e) => { if (!e.metaKey && !e.ctrlKey) setTap({ href: it.href, from: here }); }}
-                className={`inline-flex min-h-11 items-center rounded-full px-2.5 text-sm sm:px-4 font-semibold whitespace-nowrap transition-colors ${
-                  active ? "bg-ink text-cream" : "text-ink-soft hover:text-ink"
+                className={`flex min-h-10 items-center justify-center rounded-[2px] px-3 text-[0.72rem] font-semibold uppercase tracking-[0.1em] whitespace-nowrap transition-colors ${
+                  active ? "bg-navy text-white" : "text-ink-soft hover:text-ink"
                 }`}>
                 {it.label}
               </Link>

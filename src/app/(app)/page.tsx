@@ -1,388 +1,243 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { ensureCurrentPeriod, getLatestPeriod, summarize } from "@/lib/cashbook";
-import {
-  MONTHS, STATUS_LABEL, STATUS_TONE, TONE_CLASS, TZ, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, shiftMonth, todayJakarta, waLink,
-} from "@/lib/format";
+import { MONTHS, MONTHS_SHORT, STATUS_LABEL, TZ, formatDate, periodLabel, periodSlug, properName, rupiah, rupiahShort, todayJakarta } from "@/lib/format";
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
-import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
-import { dueItems, dueReminders } from "@/lib/reminders";
-import { REPEAT_LABEL, daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
+import { dueLabel as transferWhen, dueOrder, isDue, transferDue } from "@/lib/transfers";
+import { dueReminders } from "@/lib/reminders";
+import { daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
 import { startPeriod } from "@/app/actions";
-import { Empty, PageHeader, Section, WaButton } from "@/components/ui";
-import { Avatar, Chevron, CountPill, EXPENSE_META, IconBadge, ListRow, RentProgress, taskCategoryMeta } from "@/components/kit";
-import { CountUpRupiah, GreetingRobot, PaidButton, PaidRow } from "@/components/delight";
-import { RobotSvg, Sparkle } from "@/components/robot";
+import { RentProgress } from "@/components/kit";
 import { SubmitButton } from "@/components/forms";
-import { NEW_MONTH_COOKIE, NewMonthCard } from "@/components/new-month";
 import { TransferToggle } from "@/components/transfer-toggle";
-import { NotificationBell, type Notification } from "@/components/notification-bell";
-import { RoomSearch } from "@/components/room-search";
 import { RoomDrawerProvider, RoomLink } from "@/components/room-drawer";
-import { IconCalendar, IconCheck, IconChevronRight } from "@/components/icons";
+import { CollectCard, type CollectItem } from "@/components/collect-card";
+import { IconCheck, IconChevronRight } from "@/components/icons";
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 export default async function DashboardPage() {
   await ensureCurrentPeriod();
   const now = todayJakarta();
-  const [latest, rooms, upcoming, reminders, items, cookieStore] = await Promise.all([
+  const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const [latest, rooms, upcoming, lateCount, rent] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
-    db.reminder.findMany({ where: { isDone: false }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }], take: 5 }),
+    db.reminder.findMany({ where: { isDone: false }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }], take: 4 }),
+    db.reminder.count({ where: { isDone: false, dueDate: { lt: now } } }),
     dueReminders(now),
-    dueItems(now),
-    cookies(),
   ]);
-  const overdueCount = reminders.filter((r) => r.daysUntilDue < 0).length;
 
   const curYear = now.getUTCFullYear();
   const curMonth = now.getUTCMonth() + 1;
   const needsNewPeriod = !latest || latest.year * 12 + latest.month < curYear * 12 + curMonth;
-
   const summary = latest ? summarize(latest) : null;
-  // The balance card compares with last month: this month's change is exactly the net cash flow.
-  const prevMonthShort = latest ? MONTHS[shiftMonth(latest.year, latest.month, -1).month - 1].slice(0, 3) : "";
+  const label = latest ? periodLabel(latest.year, latest.month) : "";
+  const slug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
+
   const rentRooms = (latest?.roomIncomes ?? [])
     .filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK")
     .map((r) => ({ id: r.id, number: r.room.number, paid: r.status === "LUNAS" || r.status === "TAHUNAN" }));
   const rentPaid = rentRooms.filter((r) => r.paid).length;
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
   const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
-  const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
-  const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const pct = rentRooms.length ? Math.round((rentPaid / rentRooms.length) * 100) : 0;
+
+  // Rent due today or already late, most late first. Rows in the current cash book can be marked paid here.
+  const incomeByRoom = new Map(unpaid.map((r) => [r.room.number, r.id]));
+  const collect: CollectItem[] = rent
+    .filter((r) => r.daysUntilDue <= 0)
+    .sort((a, b) => a.daysUntilDue - b.daysUntilDue || a.roomNumber - b.roomNumber)
+    .map((r) => ({
+      roomNumber: r.roomNumber, tenant: properName(r.tenantName), amount: r.amount, periodLabel: periodLabel(r.year, r.month),
+      daysUntilDue: r.daysUntilDue, waHref: r.waHref,
+      incomeId: latest && r.year === latest.year && r.month === latest.month ? incomeByRoom.get(r.roomNumber) ?? null : null,
+    }));
+
+  const transfers = (latest?.transferChecks ?? [])
+    .filter((t) => t.recipient.isActive || t.isSent)
+    .map((t) => ({ t, due: transferDue(t.recipientId, latest!.year, latest!.month) }))
+    .sort((a, b) => dueOrder(a.due) - dueOrder(b.due))
+    .filter((x) => isDue(x.due));
+  const unsent = transfers.filter((x) => !x.t.isSent).length;
+
   const endingLeases = rooms
     .filter((r) => r.tenant?.leaseEndDate && r.tenant.leaseEndDate <= soon)
     .sort((a, b) => a.tenant!.leaseEndDate!.getTime() - b.tenant!.leaseEndDate!.getTime());
 
-  const label = latest ? periodLabel(latest.year, latest.month) : "";
-  // Only Max, BNI and this month's heir are due; the other heirs are shown faded with their month.
-  const transfers = (latest?.transferChecks ?? [])
-    .filter((t) => t.recipient.isActive || t.isSent)
-    .map((t) => ({ t, due: transferDue(t.recipientId, latest!.year, latest!.month) }))
-    .sort((a, b) => dueOrder(a.due) - dueOrder(b.due));
-  const transfersDue = transfers.filter((x) => isDue(x.due));
-  const transfersDone = transfersDue.filter((x) => x.t.isSent).length;
-
-  const exceptionRooms = rooms.filter((r) => r.status !== "LUNAS");
-  const paidRooms = rooms.length - exceptionRooms.length;
-  const roomNumberById = new Map(rooms.map((r) => [r.id, r.number]));
-
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }).format(new Date()));
-  const greeting = hour >= 4 && hour < 11 ? "Pagi" : hour < 15 && hour >= 11 ? "Siang" : hour >= 15 && hour < 18 ? "Sore" : "Malam";
-  const mood = hour >= 4 && hour < 11 ? "morning" : hour >= 21 || hour < 4 ? "night" : "day";
-
-  const latestSlug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
-  // First week of a month that has started: a welcome card, until dismissed.
-  const showNewMonth = Boolean(latest) && !needsNewPeriod && now.getUTCDate() <= 7
-    && cookieStore.get(NEW_MONTH_COOKIE)?.value !== latestSlug;
-  const dueTodayIds = new Set(dueToday.map((d) => d.id));
-  const attention = unpaid
-    .map((inc) => ({ inc, reminderToday: dueTodayIds.has(inc.id) }))
-    .sort((a, b) => Number(b.reminderToday) - Number(a.reminderToday) || a.inc.room.number - b.inc.room.number);
-  const notifications: Notification[] = [
-    ...(needsNewPeriod ? [{
-      id: "new-period", tone: "butter" as const,
-      title: `Start the ${periodLabel(curYear, curMonth)} cash book`,
-      detail: "This month's cash book hasn't been created yet",
-      href: "/",
-    }] : []),
-    ...items.map((i) => ({
-      id: `reminder-${i.id}`, tone: (i.daysUntilDue < 0 ? "blush" : "butter") as Notification["tone"],
-      title: i.amount ? `${i.title} · ${rupiah(i.amount)}` : i.title,
-      detail: `${reminderDueLabel(i.daysUntilDue)} (${formatDate(i.dueDate)}) · tap to mark it ${i.amount ? "paid" : "done"}`,
-      href: "/pengingat",
-    })),
-    ...(overdueCount ? [{
-      id: "overdue", tone: "blush" as const,
-      title: `${overdueCount} tenant${overdueCount > 1 ? "s" : ""} past the due date`,
-      detail: "Open reminders to send the overdue WhatsApp messages",
-      href: "/pengingat",
-    }] : []),
-    // Opens the pre-filled WhatsApp reminder itself; without a usable number it falls back to the room.
-    ...dueToday.map((inc) => {
-      const wa = waLink(inc.room.tenant?.phone, reminderText({ name: inc.room.tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year: latest!.year, month: latest!.month, dueDay: inc.room.tenant?.reminderDay ?? null }, now));
-      return {
-        id: `due-${inc.id}`, tone: "butter" as const,
-        title: `Send reminder · Room ${inc.room.number}`,
-        detail: `${inc.room.tenant?.name ?? "Tenant"} · ${wa ? "opens WhatsApp" : "no WhatsApp number saved"}`,
-        href: wa ?? `/kamar/${inc.room.number}`,
-        external: Boolean(wa),
-        roomNumber: wa ? undefined : inc.room.number,
-      };
-    }),
-    ...unpaid.filter((inc) => !dueTodayIds.has(inc.id)).map((inc) => ({
-      id: `unpaid-${inc.id}`, tone: "blush" as const,
-      title: `Room ${inc.room.number} hasn't paid`,
-      detail: `${inc.room.tenant?.name ?? "No tenant name"} · ${rupiah(inc.room.monthlyRent)} for ${label}`,
-      href: `/kas/${latestSlug}`,
-    })),
-    ...endingLeases.map((r) => ({
-      id: `lease-${r.id}`, tone: (r.tenant!.leaseEndDate! < now ? "blush" : "butter") as Notification["tone"],
-      title: `Lease ${r.tenant!.leaseEndDate! < now ? "ended" : "ending"} · Room ${r.number}`,
-      detail: `${r.tenant!.name} · ${formatDate(r.tenant!.leaseEndDate)}`,
-      href: `/kamar/${r.number}`,
-    })),
-    ...(latest && transfersDone < transfersDue.length ? [{
-      id: "transfers", tone: "peri" as const,
-      title: `${transfersDue.length - transfersDone} transfers not sent`,
-      detail: `Transfer checklist for ${label}`,
-      href: `/kas/${latestSlug}`,
-    }] : []),
-  ];
+  const greeting = hour >= 4 && hour < 11 ? "pagi" : hour >= 11 && hour < 15 ? "siang" : hour >= 15 && hour < 18 ? "sore" : "malam";
 
   return (
     <RoomDrawerProvider rooms={rooms.map(toDrawerRoom)}>
-      {/* The robot sits on the "M" of Max. Its box is sized in em so it tracks the heading's font size:
-          the seat line (2/3 down the robot, 0.63em) lands on the top of the M (0.22em below its box). */}
-      <PageHeader
-        titleLabel={`${greeting}, Max!`}
-        titleClassName="font-greeting pt-[0.55em] text-4xl leading-tight font-normal md:text-6xl"
-        title={<>
-          {greeting},{" "}
-          <span className="relative inline-block">
-            M
-            <GreetingRobot mood={mood} className="absolute top-[-0.41em] left-1/2 h-[0.95em] w-[0.95em] -translate-x-1/2" />
-          </span>
-          ax!
-        </>}
-        subtitle={
-          <div className="mt-3 flex items-center gap-2">
-            <RoomSearch rooms={rooms.map((r) => ({
-              number: r.number, status: r.status, tenant: r.tenant?.name ?? null, phone: r.tenant?.phone ?? null,
-            }))} />
-            {/* relative: the bell's panel anchors to this row's right edge, not the bell's, so it stays on screen. */}
-            <div className="relative flex shrink-0 items-center gap-2 md:hidden">
-              <NotificationBell notifications={notifications} />
-            </div>
-          </div>
-        }
-        actions={<NotificationBell notifications={notifications} />}
-        actionsClassName="hidden self-start md:mt-1 md:flex"
-      />
-
-      {showNewMonth && summary && (
-        <NewMonthCard periodKey={latestSlug} title={`${MONTHS[latest!.month - 1]} has started`} href={`/kas/${latestSlug}`}>
-          <p>
-            <span className="num font-semibold">{rentRooms.length - rentPaid}</span> {rentRooms.length - rentPaid === 1 ? "room" : "rooms"} to collect
-            {unpaidTotal > 0 && <> (<span className="num font-semibold">{rupiah(unpaidTotal)}</span>)</>}.
-            Opening balance <span className="num font-semibold">{rupiah(summary.openingBalance)}</span>, carried over from {MONTHS[shiftMonth(latest!.year, latest!.month, -1).month - 1]}.
-          </p>
-          {transfersDue.length > 0 && <p className="mt-0.5">Transfers due: {transfersDue.map((x) => x.t.recipient.name).join(", ")}.</p>}
-        </NewMonthCard>
-      )}
+      <header className="mb-5">
+        <p className="eyebrow text-ink-soft">{HARI[now.getUTCDay()]} / {now.getUTCDate()} {MONTHS_SHORT[now.getUTCMonth()]}</p>
+        <h1 className="h-display mt-1.5 text-[1.85rem] leading-[1.08]">Selamat {greeting},<br />Admin.</h1>
+      </header>
 
       {needsNewPeriod && (
-        <form action={startPeriod} className="card mb-6 flex flex-wrap items-center justify-between gap-3 bg-butter text-butter-deep">
+        <form action={startPeriod} className="card mb-4 bg-butter">
           <input type="hidden" name="year" value={curYear} />
           <input type="hidden" name="month" value={curMonth} />
-          <div className="flex items-center gap-3">
-            <IconCalendar />
-            <p className="text-sm font-semibold">
-              The {periodLabel(curYear, curMonth)} cash book hasn&apos;t been started. The closing balance of {label || "the previous month"} will carry over as its opening balance.
-            </p>
-          </div>
-          <SubmitButton pendingText="Creating…">Start {periodLabel(curYear, curMonth)}</SubmitButton>
+          <p className="eyebrow text-butter-deep">Buku kas belum dimulai</p>
+          <p className="mt-2 text-sm">
+            Buku kas {periodLabel(curYear, curMonth)} belum dibuat. Saldo akhir {label || "bulan sebelumnya"} akan jadi saldo awalnya.
+          </p>
+          <SubmitButton className="btn-primary mt-3 w-full" pendingText="Membuat…">Mulai {periodLabel(curYear, curMonth)}</SubmitButton>
         </form>
       )}
 
-      {latest && (
-        <div className="mb-4 grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          {/* Who still owes rent comes first; reminder-day rooms are a subset of the unpaid ones, so they lead the list. */}
-          {attention.length > 0 ? (
-            <Section title="Needs attention" action={<CountPill n={attention.length} />}>
-              <div className="-mt-1 mb-3 flex flex-col gap-2">
-                <RentProgress rooms={rentRooms} />
-                <p className="flex flex-wrap justify-between gap-x-3 text-xs text-ink-soft">
-                  <span><span className="num font-semibold text-ink">{rentPaid}</span> of {rentRooms.length} rooms paid</span>
-                  <span><span className="num font-semibold text-ink">{rupiah(unpaidTotal)}</span> still to collect for {label}</span>
-                </p>
+      {latest && summary && (
+        <>
+          {/* Hero: navy holds the number to act on; the two small cards say how urgent it is. */}
+          <section className="grid grid-cols-[minmax(0,1fr)_6.75rem] gap-3" aria-label="Ringkasan bulan ini">
+            <Link href={`/kas/${slug}?tab=rent`} className="card press flex min-h-[10.5rem] flex-col justify-between bg-navy text-white">
+              <span className="num text-[4.75rem] leading-[0.85] font-medium tracking-[-0.04em]">{pad2(unpaid.length)}</span>
+              <span className="eyebrow">{unpaid.length ? "Kamar belum bayar" : "Semua kamar lunas"}</span>
+            </Link>
+            <div className="flex flex-col gap-3">
+              <div className="card flex flex-1 flex-col justify-between bg-orange p-3 text-white">
+                <span className="num text-[1.65rem] leading-none font-medium">{collect.length}</span>
+                <span className="eyebrow">Tagih sekarang</span>
               </div>
-              <ul className="divide-y divide-line">
-                {attention.map(({ inc, reminderToday }) => (
-                  <li key={inc.id}>
-                    <PaidRow>
-                      <ListRow
-                        leading={<Avatar name={inc.room.tenant?.name ?? "?"} tone={reminderToday ? "butter" : "blush"} />}
-                        title={`Room ${inc.room.number} · ${inc.room.tenant?.name ?? "No tenant"}`}
-                        subtitle={
-                          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                            <span className="num">{rupiah(inc.room.monthlyRent)}</span>
-                            <span className="pill bg-blush py-0 text-blush-deep">Unpaid</span>
-                            {reminderToday && <span className="pill bg-butter py-0 text-butter-deep">Reminder today</span>}
-                          </span>
-                        }
-                        trailing={
-                          <div className="flex shrink-0 gap-2">
-                            <WaButton iconOnly phone={inc.room.tenant?.phone} label={`Remind ${inc.room.tenant?.name ?? "tenant"} on WhatsApp`}
-                              text={reminderText({ name: inc.room.tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year: latest.year, month: latest.month, dueDay: inc.room.tenant?.reminderDay ?? null }, now)} />
-                            <PaidButton incomeId={inc.id} roomNumber={inc.room.number} />
-                          </div>
-                        } />
-                    </PaidRow>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          ) : (
-            <section className="card flex items-center gap-4 bg-mint text-mint-deep" aria-live="polite">
-              <div className="relative h-20 w-20 shrink-0">
-                <RobotSvg className="robot-cheer absolute inset-3" />
-                <svg viewBox="0 0 40 40" className="absolute inset-0 text-butter-deep" aria-hidden>
-                  <Sparkle x={6} y={9} size={1.4} />
-                  <Sparkle x={34} y={8} size={1.1} className="late" />
-                  <Sparkle x={35} y={31} className="later" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <p className="h-display text-2xl text-ink">Semua lunas!</p>
-                <p className="text-sm">Everyone&apos;s paid for {label}. Nice work.</p>
-              </div>
-            </section>
-          )}
+              <Link href="/pengingat" className="card press flex flex-1 flex-col justify-between p-3">
+                <span className={`num text-[1.65rem] leading-none font-medium ${lateCount ? "text-orange-text" : ""}`}>{lateCount}</span>
+                <span className="eyebrow">Pengingat telat</span>
+              </Link>
+            </div>
+          </section>
 
-          {summary && (
-            <section className="card flex min-w-0 flex-col gap-4 border-transparent bg-terra-soft text-ink" aria-labelledby="money-title">
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <h2 id="money-title" className="text-xs font-semibold text-ink-soft">Closing balance · {label}</h2>
-                  <span className={`pill shrink-0 ${summary.netFlow > 0 ? "bg-mint text-mint-deep" : summary.netFlow < 0 ? "bg-blush text-blush-deep" : "bg-white text-ink-soft"}`}>
-                    {summary.netFlow === 0 ? `Same as ${prevMonthShort}` : <>
-                      <span aria-hidden>{summary.netFlow > 0 ? "▲" : "▼"}</span>
-                      <span className="sr-only">{summary.netFlow > 0 ? "Up" : "Down"}</span>{" "}
-                      <span className="num">{rupiah(Math.abs(summary.netFlow))}</span> vs {prevMonthShort}
-                    </>}
-                  </span>
-                </div>
-                <div className="num mt-1 text-3xl font-semibold tracking-tight break-words text-terra-strong md:text-4xl">
-                  <CountUpRupiah from={summary.openingBalance} to={summary.closingBalance} />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {/* Each row opens that part of the cash book: rent, or the expense list with its details. */}
-                {([
-                  ["Income", summary.incomeTotal, "bg-mint-deep", "rent"],
-                  ["Expenses", summary.expenseTotal, "bg-terra-strong", "expenses"],
-                ] as const).map(([name, n, bar, tab]) => (
-                  <Link key={name} href={`/kas/${latestSlug}?tab=${tab}`}
-                    className="-mx-2 block rounded-2xl px-2 py-1.5 transition-colors hover:bg-white/60">
-                    <div className="flex items-baseline justify-between gap-3 text-xs">
-                      <span className="text-ink-soft">{name}</span>
-                      <span className="num flex items-center gap-1 font-semibold">{rupiah(n)} <IconChevronRight width={12} height={12} className="text-ink-soft" /></span>
-                    </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white" aria-hidden>
-                      <div className={`h-full rounded-full ${bar}`}
-                        style={{ width: `${(n / Math.max(summary.incomeTotal, summary.expenseTotal, 1)) * 100}%` }} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              <div className="flex items-center justify-between gap-3 border-t border-terra/25 pt-3 text-xs">
-                <span className="text-ink-soft">Opening balance</span>
-                <span className="num font-semibold">{rupiah(summary.openingBalance)}</span>
-              </div>
-            </section>
-          )}
-        </div>
+          <section className="mt-3 grid grid-cols-2 gap-3" aria-label="Uang">
+            <Link href={`/kas/${slug}`} className="card press p-3.5">
+              <span className="num block text-[1.35rem] leading-none font-medium">{rupiahShort(summary.closingBalance)}</span>
+              <span className="eyebrow mt-2 block text-ink-soft">Saldo kas</span>
+            </Link>
+            <Link href={`/kas/${slug}?tab=rent`} className="card press p-3.5">
+              <span className="num block text-[1.35rem] leading-none font-medium">{rupiahShort(unpaidTotal)}</span>
+              <span className="eyebrow mt-2 block text-ink-soft">Masih ditunggu</span>
+            </Link>
+          </section>
+
+          <section className="card mt-3" aria-labelledby="rent-title">
+            <div className="mb-2.5 flex justify-between gap-3">
+              <h2 id="rent-title" className="eyebrow text-ink-soft">Sewa masuk · {label}</h2>
+              <span className="eyebrow num">{pct}%</span>
+            </div>
+            <RentProgress rooms={rentRooms} />
+            <p className="mt-2 text-sm text-ink-soft">
+              <b className="num font-semibold text-ink">{rentPaid}</b> dari {rentRooms.length} kamar sudah bayar
+              {unpaidTotal > 0 && <>, <span className="num">{rupiah(unpaidTotal)}</span> lagi</>}
+            </p>
+          </section>
+
+          <div className="mt-4"><CollectCard items={collect} /></div>
+        </>
       )}
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        {/* Only exceptions get a colour; paid rooms fold into one neutral tile. The Rooms tab has the full list. */}
-        <Section title="Room status" action={<Link href="/kamar" className="-my-2 inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">Manage</Link>}>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            {exceptionRooms.map((r) => (
-              <RoomLink key={r.id} roomNumber={r.number}
-                className={`rounded-2xl p-3 transition-transform duration-[120ms] hover:-translate-y-0.5 active:scale-[0.97] ${TONE_CLASS[STATUS_TONE[r.status]]}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="h-display text-lg">R{r.number}</span>
-                  <span className="text-xs font-semibold">{STATUS_LABEL[r.status]}</span>
-                </div>
-                <div className="mt-2 truncate text-xs font-semibold">{r.tenant?.name ?? "No tenant"}</div>
-                <div className="num text-xs">{rupiahShort(r.monthlyRent)}</div>
-              </RoomLink>
-            ))}
-            {paidRooms > 0 && (
-              <Link href="/kamar"
-                className={`flex min-h-24 flex-col justify-between gap-2 rounded-2xl bg-cream p-3 transition-transform duration-[120ms] hover:-translate-y-0.5 active:scale-[0.97] ${exceptionRooms.length === 0 ? "col-span-2 sm:col-span-4" : ""}`}>
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-mint text-mint-deep" aria-hidden>
-                  <IconCheck width={16} height={16} strokeWidth={3} />
-                </span>
-                <span className="text-sm font-semibold">
-                  <span className="h-display text-lg">{paidRooms === rooms.length ? `All ${paidRooms}` : paidRooms}</span> {paidRooms === 1 ? "room" : "rooms"} paid
-                </span>
-              </Link>
-            )}
-          </div>
-        </Section>
-
-        <div className="flex min-w-0 flex-col gap-4">
-          {transfers.length > 0 && (
-            <Section title="Transfers this month" action={<span className="pill bg-cream">{transfersDone}/{transfersDue.length}</span>}>
-              <ul className="flex flex-wrap gap-2">
-                {transfers.map(({ t, due }) => (
-                  <li key={t.id}>
-                    <TransferToggle variant="pill" id={t.id} sent={t.isSent} amount={t.amount ?? t.recipient.monthlyAmount} name={t.recipient.name}
-                      className={`pill min-h-11 cursor-pointer px-3.5 disabled:opacity-50 ${
-                        t.isSent ? "bg-mint text-mint-deep"
-                          : due.kind === "turn" ? "bg-butter text-butter-deep"
-                          : isDue(due) ? "bg-cream text-ink-soft"
-                          : "border border-dashed border-line text-ink-soft"
-                      }`}>
-                      {t.isSent ? <IconCheck width={12} height={12} /> : <span className="inline-block h-3 w-3 rounded-full border-2 border-current" aria-hidden />}
-                      {t.recipient.name}
-                      <span className="font-medium opacity-75">· {dueLabel(due)}</span>
-                    </TransferToggle>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {endingLeases.length > 0 && (
-            <Section title="Leases ending soon">
-              <ul className="divide-y divide-line">
-                {endingLeases.map((r) => (
-                  <li key={r.id}>
-                    <Link href={`/kamar/${r.number}`} className="block">
-                      <ListRow
-                        leading={<Avatar name={r.tenant!.name} tone={r.tenant!.leaseEndDate! < now ? "blush" : "butter"} />}
-                        title={`Room ${r.number} · ${r.tenant!.name}`}
-                        subtitle={<span className="num">{r.tenant!.leaseEndDate! < now ? "Ended" : "Ends"} {formatDate(r.tenant!.leaseEndDate)}</span>}
-                        trailing={<Chevron />} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          <Section title="Coming up" action={<Link href="/pengingat" className="inline-flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline">All reminders</Link>}>
-            {upcoming.length === 0 ? <Empty>Nothing coming up. Add a reminder from the menu.</Empty> : (
-              <ul className="divide-y divide-line">
-                {upcoming.map((r) => {
-                  const meta = r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag);
-                  const days = daysUntil(r.dueDate, now);
-                  return (
-                    <li key={r.id}>
-                      <Link href="/pengingat" className="block">
-                        <ListRow
-                          leading={<IconBadge icon={meta.icon} tone={meta.tone} />}
-                          title={r.title}
-                          subtitle={[r.amount ? rupiah(r.amount) : null, r.repeat !== "NONE" ? REPEAT_LABEL[r.repeat] : null,
-                            r.roomId && roomNumberById.get(r.roomId) ? `Room ${roomNumberById.get(r.roomId)}` : null].filter(Boolean).join(" · ") || undefined}
-                          trailing={
-                            <span className={`pill shrink-0 ${days !== null && days < 0 ? "bg-blush text-blush-deep" : days !== null && days <= 1 ? "bg-butter text-butter-deep" : "bg-cream text-ink-soft"}`}>
-                              {days !== null && days > 1 ? formatDate(r.dueDate) : reminderDueLabel(days)}
-                            </span>
-                          } />
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Section>
+      <section className="mt-8" aria-labelledby="rooms-title">
+        <div className="flex items-center justify-between border-b-[1.5px] border-ink">
+          <h2 id="rooms-title" className="eyebrow">Status kamar</h2>
+          <Link href="/kamar" className="eyebrow inline-flex min-h-11 items-center text-ink-soft underline underline-offset-4">Semua kamar</Link>
         </div>
-      </div>
+        <div className="mt-3 grid grid-cols-8 gap-1.5">
+          {rooms.map((r) => {
+            const paid = r.status === "LUNAS" || r.status === "TAHUNAN";
+            return (
+              <RoomLink key={r.id} roomNumber={r.number}
+                aria-label={`Kamar ${r.number}, ${r.tenant ? properName(r.tenant.name) : "tanpa penghuni"}, ${STATUS_LABEL[r.status]}`}
+                className={`num grid aspect-square min-h-9 place-items-center rounded-[3px] border-[1.5px] border-ink text-[0.8rem] font-medium transition-transform active:scale-90 ${
+                  paid ? "bg-navy text-white" : r.status === "TUNDA_BAYAR" ? "bg-orange text-white" : "bg-card"}`}
+                style={r.status === "RUSAK" ? { background: "repeating-linear-gradient(135deg, var(--color-card) 0 4px, var(--color-ink) 4px 5.5px)" } : undefined}>
+                <span className={r.status === "RUSAK" ? "bg-card px-0.5" : ""}>{r.number}</span>
+              </RoomLink>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-ink-soft">Navy lunas · oranye belum bayar · putih kosong · arsir rusak. Ketuk kamar untuk aksi cepat.</p>
+      </section>
+
+      {endingLeases.length > 0 && (
+        <section className="card mt-6" aria-labelledby="lease-title">
+          <h2 id="lease-title" className="eyebrow text-ink-soft">Kontrak segera berakhir</h2>
+          <ul className="mt-2 divide-y divide-line">
+            {endingLeases.map((r) => {
+              const ended = r.tenant!.leaseEndDate! < now;
+              return (
+                <li key={r.id}>
+                  <Link href={`/kamar/${r.number}`} className="flex min-h-12 items-center justify-between gap-3">
+                    <span className="min-w-0 truncate font-medium">Kamar {r.number} · {properName(r.tenant!.name)}</span>
+                    <span className={`num shrink-0 text-sm ${ended ? "font-semibold text-orange-text" : "text-ink-soft"}`}>
+                      {ended ? "Berakhir" : "Sampai"} {formatDate(r.tenant!.leaseEndDate)}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <section className="mt-8" aria-labelledby="next-title">
+        <div className="flex items-center justify-between border-b-[1.5px] border-ink">
+          <h2 id="next-title" className="eyebrow">Berikutnya</h2>
+          <Link href="/pengingat" className="eyebrow inline-flex min-h-11 items-center text-ink-soft underline underline-offset-4">Semua pengingat</Link>
+        </div>
+        {upcoming.length === 0 ? (
+          <p className="py-4 text-sm text-ink-soft">Tidak ada pengingat. Tambah dari menu AD.</p>
+        ) : (
+          <ol>
+            {upcoming.map((u, k) => {
+              const days = daysUntil(u.dueDate, now);
+              return (
+                <li key={u.id} className="border-b border-line">
+                  <Link href="/pengingat" className="flex min-h-14 items-center gap-3 py-2">
+                    <span className="num w-6 shrink-0 text-sm text-ink-soft">{pad2(k + 1)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{u.title}</span>
+                      <span className={`text-xs ${days !== null && days < 0 ? "font-semibold text-orange-text" : "text-ink-soft"}`}>
+                        {[u.amount ? rupiah(u.amount) : null, days !== null && days > 1 ? formatDate(u.dueDate) : reminderDueLabel(days)].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <IconChevronRight width={16} className="shrink-0 text-ink-soft" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+
+      {transfers.length > 0 && (
+        <section className="card mt-6" aria-labelledby="transfer-title">
+          <h2 id="transfer-title" className="eyebrow text-ink-soft">Transfer</h2>
+          <p className="mt-2 text-lg leading-snug">
+            {unsent === 0 ? "Semua transfer bulan ini sudah dikirim."
+              : <>Masih <span className="font-semibold text-orange-text">{unsent} transfer</span> yang belum dikirim bulan ini.</>}
+          </p>
+          <ul className="mt-2">
+            {transfers.map(({ t, due }) => (
+              <li key={t.id}>
+                <TransferToggle variant="pill" id={t.id} sent={t.isSent} amount={t.amount ?? t.recipient.monthlyAmount} name={t.recipient.name}
+                  className="flex min-h-11 w-full cursor-pointer items-center gap-3 text-left disabled:opacity-60">
+                  <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center border-[1.5px] border-ink ${t.isSent ? "bg-navy text-white" : "bg-card"}`}>
+                    {t.isSent && <IconCheck width={14} strokeWidth={2.6} />}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{t.recipient.name}</span>
+                  <span className="eyebrow shrink-0 text-ink-soft">{transferWhen(due)}</span>
+                </TransferToggle>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-ink-soft">Centang saat sudah dikirim; nominalnya tercatat sebagai pengeluaran.</p>
+        </section>
+      )}
+
+      {latest && (
+        <Link href={`/kas/${slug}`} className="btn-primary press mt-6 min-h-16 w-full text-[0.8rem]">
+          Buka buku kas {MONTHS[latest.month - 1]}
+        </Link>
+      )}
     </RoomDrawerProvider>
   );
 }

@@ -99,7 +99,7 @@ export function AutoSubmitAmount({ defaultValue, ...rest }: Omit<AmountInputProp
 
 // Two-step inline confirm; native confirm() is silently blocked in some embedded browsers.
 // Once armed it stays armed until the user taps confirm or the × (or presses Escape): no timer.
-export function ConfirmButton({ message, children, className, confirmText = "Delete?", pendingText = "Deleting…", ...rest }: ComponentProps<"button"> & {
+export function ConfirmButton({ message, children, className, confirmText = "Hapus?", pendingText = "Menghapus…", ...rest }: ComponentProps<"button"> & {
   message: string;
   confirmText?: string;
   pendingText?: string;
@@ -117,12 +117,12 @@ export function ConfirmButton({ message, children, className, confirmText = "Del
           disabled={pending}
           title={message}
           aria-label={message}
-          className="pill min-h-11 cursor-pointer bg-blush-deep px-4 text-white hover:bg-blush-deep/85 md:min-h-9">
+          className="btn btn-sm border-ink bg-orange text-white">
           {pending ? pendingText : confirmText}
         </button>
         {!pending && (
-          <button type="button" aria-label="Cancel" title="Cancel" onClick={() => setArmed(false)}
-            className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-cream-2 hover:text-ink md:h-9 md:w-9">
+          <button type="button" aria-label="Batal" title="Batal" onClick={() => setArmed(false)}
+            className="grid h-11 w-11 cursor-pointer place-items-center rounded-[4px] text-ink-soft hover:bg-cream hover:text-ink md:h-9 md:w-9">
             <IconClose width={16} />
           </button>
         )}

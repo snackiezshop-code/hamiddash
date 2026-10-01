@@ -1,4 +1,4 @@
-import { MONTHS, shiftMonth } from "./format";
+import { MONTHS_SHORT, shiftMonth } from "./format";
 
 // The heirs take turns: one of them receives the transfer each month, in this order.
 // Keyed by recipient id so it survives renames. Everyone not listed (Max) is paid every month.
@@ -24,12 +24,12 @@ export function transferDue(recipientId: string, year: number, month: number): T
   const monthsAhead = (idx - current + HEIR_TURNS.length) % HEIR_TURNS.length;
   if (monthsAhead === 0) return { kind: "turn" };
   const next = shiftMonth(year, month, monthsAhead);
-  return { kind: "later", label: MONTHS[next.month - 1].slice(0, 3), monthsAhead };
+  return { kind: "later", label: MONTHS_SHORT[next.month - 1], monthsAhead };
 }
 
 export const isDue = (d: TransferDue) => d.kind !== "later";
 
-export const dueLabel = (d: TransferDue) => (d.kind === "monthly" ? "Monthly" : d.kind === "turn" ? "This month" : d.label);
+export const dueLabel = (d: TransferDue) => (d.kind === "monthly" ? "Tiap bulan" : d.kind === "turn" ? "Giliran bulan ini" : `Giliran ${d.label}`);
 
 // Due transfers first (monthly, then this month's heir), then the other heirs by how soon their turn comes.
 export function dueOrder(d: TransferDue) {

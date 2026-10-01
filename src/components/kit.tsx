@@ -14,13 +14,12 @@ export const PASTEL_BG: Record<Pastel, string> = {
   peri: "bg-peri",
 };
 
-// Pixel glyph in a soft pastel circle (brief 6.10). Icons stay ink so they read on every pastel.
-// The glyph is a multiple of 12px so its 2px pixels land on whole screen pixels.
+// Line icon in a small outlined square tinted by category. Icons stay ink so they read on every tint.
 export function IconBadge({ icon: Glyph, tone, size = 40 }: { icon: AppIcon; tone: Pastel; size?: number }) {
   return (
-    <span className={`grid shrink-0 place-items-center rounded-full text-ink ${PASTEL_BG[tone]}`}
+    <span className={`grid shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink text-ink ${PASTEL_BG[tone]}`}
       style={{ width: size, height: size }} aria-hidden>
-      <Glyph width={Math.max(12, Math.round((size * 0.6) / 12) * 12)} />
+      <Glyph width={Math.round(size * 0.5)} />
     </span>
   );
 }
@@ -32,8 +31,8 @@ export function initials(name: string | null | undefined) {
 
 export function Avatar({ name, tone, size = 40, className = "" }: { name: string; tone: Pastel; size?: number; className?: string }) {
   return (
-    <span className={`grid shrink-0 place-items-center rounded-full font-display font-extrabold text-ink ${PASTEL_BG[tone]} ${className}`}
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }} aria-hidden>
+    <span className={`grid shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink font-semibold text-ink ${PASTEL_BG[tone]} ${className}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }} aria-hidden>
       {initials(name)}
     </span>
   );
@@ -57,10 +56,10 @@ export function ListRow({ leading, title, subtitle, trailing, wrapTitle = false 
   wrapTitle?: boolean;
 }) {
   return (
-    <div className="flex min-h-14 items-center gap-3 py-2">
+    <div className="flex min-h-14 items-center gap-3 py-2.5">
       {leading}
       <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold ${wrapTitle ? "break-words" : "truncate"}`}>{title}</div>
+        <div className={`text-sm font-medium ${wrapTitle ? "break-words" : "truncate"}`}>{title}</div>
         {subtitle && <div className="truncate text-xs text-ink-soft">{subtitle}</div>}
       </div>
       {trailing}
@@ -69,7 +68,7 @@ export function ListRow({ leading, title, subtitle, trailing, wrapTitle = false 
 }
 
 export function CountPill({ n }: { n: number }) {
-  return <span className="num grid h-6 min-w-6 place-items-center rounded-full bg-ink px-2 text-xs font-semibold text-cream">{n}</span>;
+  return <span className="num grid h-6 min-w-6 place-items-center rounded-[3px] bg-navy px-1.5 text-xs font-semibold text-white">{n}</span>;
 }
 
 export function Chevron() {
@@ -106,18 +105,19 @@ export const EXPENSE_META: Record<ExpenseCategory, CategoryMeta> = {
   LAINNYA: { tone: "blush", icon: IconMore },
 };
 
-// Rent collected this month as one pixel block per room that owes rent (empty and broken rooms
-// don't count; yearly payers count as paid). Blocks keep their room order, so a newly paid room
-// fills in place.
+// Rent collected this month: one segment per room that owes rent (empty and broken rooms don't
+// count; yearly payers count as paid), inside an outlined bar. Paid segments are orange and fill in
+// room order on load.
 export function RentProgress({ rooms }: { rooms: { id: string; number: number; paid: boolean }[] }) {
   const paid = rooms.filter((r) => r.paid).length;
   return (
     <div role="progressbar" aria-valuemin={0} aria-valuemax={rooms.length} aria-valuenow={paid}
-      aria-label={`Rent collected: ${paid} of ${rooms.length} rooms`} className="flex gap-1">
+      aria-label={`Sewa masuk: ${paid} dari ${rooms.length} kamar`}
+      className="flex h-3.5 gap-[2px] border-[1.5px] border-ink p-[2px]">
       {rooms.map((r, i) => (
-        <span key={r.id} title={`Room ${r.number} · ${r.paid ? "paid" : "unpaid"}`}
-          className={`h-3 min-w-0 flex-1 transition-colors duration-300 ${r.paid ? "bg-mint-deep" : "bg-cream-2"}`}
-          style={{ transitionDelay: `${i * 25}ms` }} />
+        <span key={r.id} title={`Kamar ${r.number} · ${r.paid ? "lunas" : "belum bayar"}`}
+          className={`min-w-0 flex-1 ${r.paid ? "seg-fill bg-orange" : ""}`}
+          style={{ animationDelay: `${i * 40}ms` }} />
       ))}
     </div>
   );

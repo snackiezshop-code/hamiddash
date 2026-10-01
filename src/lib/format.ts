@@ -1,9 +1,11 @@
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
 
 export const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
+// Three-letter Indonesian month names (Agu, Okt, Des), for tight spots.
+export const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 export function rupiah(n: number) {
   return (n < 0 ? "-Rp" : "Rp") + Math.abs(n).toLocaleString("id-ID");
@@ -12,8 +14,8 @@ export function rupiah(n: number) {
 export function rupiahShort(n: number) {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}Rp${(abs / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}M`;
-  if (abs >= 1_000) return `${sign}Rp${Math.round(abs / 1_000)}k`;
+  if (abs >= 1_000_000) return `${sign}Rp${(abs / 1_000_000).toLocaleString("id-ID", { maximumFractionDigits: 2 })} jt`;
+  if (abs >= 1_000) return `${sign}Rp${Math.round(abs / 1_000)} rb`;
   return rupiah(n);
 }
 
@@ -48,8 +50,8 @@ export function shiftMonth(year: number, month: number, delta: number) {
 export const TZ = "Asia/Jakarta";
 
 export function formatDate(d: Date | null | undefined) {
-  if (!d) return "Not set";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: TZ });
+  if (!d) return "Belum diisi";
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: TZ });
 }
 
 // "Today" for business logic (new month rollover, reminder days, overdue checks) must follow
@@ -66,14 +68,14 @@ export function dateInputValue(d: Date | null | undefined) {
 export const STATUS_OPTIONS: RoomStatus[] = ["LUNAS", "TUNDA_BAYAR", "KOSONG", "RUSAK", "TAHUNAN"];
 
 export const STATUS_LABEL: Record<RoomStatus, string> = {
-  LUNAS: "Paid",
-  TUNDA_BAYAR: "Unpaid",
-  KOSONG: "Vacant",
-  RUSAK: "Damaged",
-  TAHUNAN: "Annual",
+  LUNAS: "Lunas",
+  TUNDA_BAYAR: "Belum bayar",
+  KOSONG: "Kosong",
+  RUSAK: "Rusak",
+  TAHUNAN: "Tahunan",
 };
 
-// Tailwind classes per the approved palette: mint=paid, blush=unpaid, butter=damaged, periwinkle=vacant/annual.
+// Status tints: mint = paid, blush = unpaid, butter = damaged, peri = vacant / annual.
 export const STATUS_TONE: Record<RoomStatus, "mint" | "blush" | "butter" | "peri"> = {
   LUNAS: "mint",
   TUNDA_BAYAR: "blush",
@@ -87,8 +89,8 @@ export const TONE_CLASS = {
   blush: "bg-blush text-blush-deep",
   butter: "bg-butter text-butter-deep",
   peri: "bg-peri text-peri-deep",
-  ink: "bg-ink text-cream",
-  white: "bg-white text-ink",
+  ink: "bg-navy text-white",
+  white: "bg-card text-ink",
 } as const;
 
 export type Tone = keyof typeof TONE_CLASS;
@@ -99,17 +101,17 @@ export const CATEGORY_OPTIONS: ExpenseCategory[] = [
 ];
 
 export const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
-  LISTRIK: "Electricity",
-  PDAM: "Water (PDAM)",
-  CLEANING_SERVICE: "Cleaning service",
-  KEBERSIHAN: "Cleaning supplies",
-  PERBAIKAN: "Repairs",
+  LISTRIK: "Listrik",
+  PDAM: "Air (PDAM)",
+  CLEANING_SERVICE: "Jasa kebersihan",
+  KEBERSIHAN: "Alat kebersihan",
+  PERBAIKAN: "Perbaikan",
   INTERNET: "Internet",
-  PERLENGKAPAN: "Equipment",
-  ADMINISTRASI: "Admin fees",
-  PENGURUS: "Caretaker",
-  BAGI_HASIL: "Profit share",
-  LAINNYA: "Other",
+  PERLENGKAPAN: "Perlengkapan",
+  ADMINISTRASI: "Biaya admin",
+  PENGURUS: "Pengurus",
+  BAGI_HASIL: "Bagi hasil",
+  LAINNYA: "Lainnya",
 };
 
 // "Other" expenses carry a typed-in name ("PBB", "Iuran RT"); every other category uses its fixed label.
@@ -190,8 +192,7 @@ export function reminderText(r: ReminderInput, today: Date = todayJakarta()) {
     dueLine = `• Jatuh tempo: ${dueLabel}\n`;
   }
 
-  // Names are often stored in caps ("KIKI"); greet as "Kiki".
-  const name = r.name.trim().toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+  const name = properName(r.name);
   const greeting = name ? `Assalamualaikum ${name},` : "Assalamualaikum,";
   return [
     greeting,
@@ -215,6 +216,11 @@ export function reminderText(r: ReminderInput, today: Date = todayJakarta()) {
     "Terima kasih atas kerja samanya 🙏",
     "Wassalamualaikum.",
   ].join("\n");
+}
+
+// Names are often stored in caps ("KIKI"); show them as "Kiki".
+export function properName(name: string | null | undefined) {
+  return (name ?? "").trim().toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 }
 
 export function parseAmount(v: FormDataEntryValue | null) {

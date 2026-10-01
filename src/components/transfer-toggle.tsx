@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { toggleTransfer } from "@/app/actions";
 import { rupiah } from "@/lib/format";
-import { CoinBurst } from "./delight";
 import { SubmitButton } from "./forms";
 import { SwitchSubmit } from "./kit-client";
 import { toast } from "./toast";
 
-// Ticking a transfer records its expense on the server; here it pops coins and confirms the amount,
-// with Undo in the toast (unticking removes the expense again).
+// Ticking a transfer records its expense on the server; the toast confirms the amount and offers
+// Batalkan (unticking removes the expense again).
 export function TransferToggle({ id, sent, amount, name, variant, className = "", children }: {
   id: string;
   sent: boolean;
@@ -19,15 +18,12 @@ export function TransferToggle({ id, sent, amount, name, variant, className = ""
   className?: string;
   children?: ReactNode;
 }) {
-  const [burst, setBurst] = useState(0);
-
   const run = async (fd: FormData) => {
     const sending = !sent;
-    if (sending && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setBurst((b) => b + 1);
     await toggleTransfer(fd);
     if (sending) {
-      toast(amount ? `${rupiah(amount)} to ${name} added to expenses` : `Transfer to ${name} marked sent. Set its amount in Settings to record the expense.`, {
-        label: "Undo",
+      toast(amount ? `Transfer ${rupiah(amount)} ke ${name} dicatat sebagai pengeluaran` : `Transfer ke ${name} ditandai terkirim. Isi nominalnya di Pengaturan supaya tercatat sebagai pengeluaran.`, {
+        label: "Batalkan",
         onClick: () => {
           const undo = new FormData();
           undo.set("id", id);
@@ -35,7 +31,7 @@ export function TransferToggle({ id, sent, amount, name, variant, className = ""
         },
       });
     } else if (amount) {
-      toast(`${rupiah(amount)} to ${name} removed from expenses`);
+      toast(`Transfer ${rupiah(amount)} ke ${name} dihapus dari pengeluaran`);
     }
   };
 
@@ -43,9 +39,8 @@ export function TransferToggle({ id, sent, amount, name, variant, className = ""
     <form action={run} className="relative">
       <input type="hidden" name="id" value={id} />
       {variant === "switch"
-        ? <SwitchSubmit checked={sent} label={`Transfer to ${name} sent`} />
+        ? <SwitchSubmit checked={sent} label={`Transfer ke ${name} terkirim`} />
         : <SubmitButton className={className} aria-pressed={sent}>{children}</SubmitButton>}
-      {burst > 0 && <span key={burst} className="pointer-events-none absolute inset-0"><CoinBurst /></span>}
     </form>
   );
 }

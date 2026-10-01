@@ -1,41 +1,47 @@
 @import "tailwindcss";
 
 @theme {
-  /* White and calm (2026-09-28 refresh): white page, warm off-white fills, hairline borders.
-     One accent: muted terracotta (the robot's colour), kept for primary actions and the mascot.
+  /* Panel (2026-10 redesign): a cream desk of outlined cards with hard offset shadows.
+     Navy carries the one number or action that matters; orange-red marks what needs doing now.
      Every text pairing below is checked for WCAG AA. */
-  --color-cream: #F7F4F0; /* subtle fill: inputs, sheets, totals rows (ink-soft on it 5.38:1) */
-  --color-cream-2: #EEE9E2; /* hover / pressed fill */
-  --color-ink: #211D19;
-  --color-ink-soft: #6B635A;
-  --color-line: #E8E2D9;
+  --color-paper: #ECE7DD; /* page */
+  --color-card: #FAF8F3; /* card surface */
+  --color-ink: #14171C; /* text, borders, shadows */
+  --color-ink-soft: #55524B; /* secondary text: 6.4:1 on card, 5.6:1 on paper */
+  --color-line: #CBC5BA; /* hairline dividers inside cards (no text) */
+  --color-cream: #F1EDE5; /* subtle fill inside a card: inputs at rest, hover rows */
+  --color-cream-2: #E6E0D5; /* pressed fill, empty segments */
 
-  /* Accent. terra-strong carries white text (5.53:1) and reads as text on white (5.53:1).
-     Plain terra is for text-free fills only (bars, the mascot). */
-  --color-terra: #C27A62;
-  --color-terra-strong: #A0533D;
-  /* Soft terracotta fill for the Overview balance card: terra-strong text 4.9:1, ink-soft 5.23:1. */
-  --color-terra-soft: #FBEFE8;
+  --color-navy: #1C2A3A; /* primary: white text 14:1 */
+  --color-navy-hover: #263850;
+  --color-orange: #D9390F; /* action-now fill: white text 4.6:1 */
+  --color-orange-text: #B8300C; /* orange as small text on card/paper: 5.7:1 */
 
-  /* Status tints, soft enough that only what needs attention stands out. Each "deep" tone is
-     the text colour on its tint: blush 6.22:1, mint 5.87:1, butter 6.3:1, peri 7.52:1. */
-  --color-blush: #F6E6DF;
-  --color-blush-deep: #8E3A26;
-  --color-mint: #E4EFE6;
-  --color-mint-deep: #2F6446;
-  --color-butter: #F5ECD2;
-  --color-butter-deep: #6A5212;
-  --color-peri: #E7EAF3;
-  --color-peri-deep: #3A4677;
+  /* Status tints for chips and badges. Each "-deep" is the text on its tint:
+     mint (paid) 11:1, blush (unpaid / late) 5.6:1, butter (today / soon) 6.9:1, peri (vacant / annual) 8.8:1. */
+  --color-mint: #DDE4EC;
+  --color-mint-deep: #1C2A3A;
+  --color-blush: #F7DED3;
+  --color-blush-deep: #A32C0B;
+  --color-butter: #F2E5C2;
+  --color-butter-deep: #5E480E;
+  --color-peri: #E4E1DA;
+  --color-peri-deep: #3D3A35;
 
-  --color-flag: #c43a26;
+  /* Older names still used by a few screens: terra = action-now, terra-strong = primary. */
+  --color-terra: #D9390F;
+  --color-terra-strong: #1C2A3A;
+  --color-terra-soft: #F1EDE5;
+  --color-flag: #B8300C;
   /* Off-state switch track: 3.4:1 against its white knob. */
   --color-track: #8f8a80;
 
-  --font-display: var(--font-gelasio), Georgia, serif;
-  --font-sans: var(--font-vt323), ui-monospace, monospace;
-  --font-mono: var(--font-vt323), ui-monospace, monospace;
-  --font-greeting: var(--font-gelasio), Georgia, serif;
+  /* Space Grotesk everywhere: its squared grotesk shapes match the outlined-card look, and its
+     tabular figures keep rupiah columns aligned. */
+  --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-greeting: var(--font-space), ui-sans-serif, system-ui, sans-serif;
 
   /* Type scale: 13 / 16 / 17 / 20 / 24 / 28 / 32 / 40 — body text never below 16px */
   --text-xs: 0.8125rem;
@@ -55,45 +61,27 @@
   --text-4xl: 2.5rem;
   --text-4xl--line-height: 3rem;
 
-  --radius-card: 24px;
-}
-
-:root {
-  /* Splash-page robot colors */
-  --robot: #C27A62;
-  --robot-dark: #A0533D;
-  /* Bare --ink alias used by the robot SVG fill */
-  --ink: #211D19;
+  --radius-card: 4px;
 }
 
 html {
   color-scheme: light;
 }
 
-/* VT323's lowercase letters are small for their font size, so font-size-adjust scales it to the
-   x-height a regular sans would have: the type scale stays the same and text stays readable.
-   Gelasio headings keep their own proportions. */
 body {
-  background: #ffffff;
+  background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size-adjust: 0.5;
-}
-:where(.font-display, .font-greeting, .font-splash, .h-display) {
-  font-size-adjust: none;
 }
 
 .num {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
 }
 
-/* Unlayered, so it outranks Tailwind's `outline-none`. Inputs sitting inside a pill that draws
-   its own focus-within ring opt out with `outline-none!`. */
+/* Unlayered, so it outranks Tailwind's `outline-none`. */
 :focus-visible {
-  outline: 2px solid var(--color-ink);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-orange);
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -103,89 +91,7 @@ body {
   }
 }
 
-/* ── Robot (splash page + dashboard header) ──────────────────────────── */
-.robot-wrap { width: 72px; height: 72px; position: relative; }
-/* Body stays still; only the right arm waves */
-.robot { width: 100%; height: 100%; transform-origin: bottom center; }
-/* fill-box makes transform-origin relative to each rect's own bounding box */
-.robot rect.arm { transform-box: fill-box; }
-/* Right arm rotates from the shoulder (left edge, vertical center = 0% 50%) */
-.robot rect.arm.right {
-  transform-origin: 0% 50%;
-  animation: robot-wave 1.5s ease-in-out infinite;
-}
-.robot rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 2.6s ease-in-out infinite; }
-.robot rect.eye.right { animation-delay: 0.05s; }
-.splash-shadow { width: 40px; height: 8px; border-radius: 50%; background: rgba(23, 20, 15, 0.12); margin: 0 auto; }
-/* Two quick waves, then rest until next cycle */
-@keyframes robot-wave { 0%, 75%, 100% { transform: rotate(0deg); } 15% { transform: rotate(-55deg); } 30% { transform: rotate(-35deg); } 45% { transform: rotate(-55deg); } 60% { transform: rotate(-35deg); } }
-@keyframes robot-blink { 0%, 88%, 100% { transform: scaleY(1); } 92% { transform: scaleY(0.1); } }
-
-/* Dashboard greeting robot: hops with a squashing shadow. Lift is 20% of its height (14px at 72px). */
-.robot-bounce { animation: robot-bounce 1.1s ease-in-out infinite; }
-.robot-bounce rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 2.6s ease-in-out infinite; }
-.robot-bounce rect.eye.right { animation-delay: 0.05s; }
-.robot-bounce-shadow { background: rgba(23, 20, 15, 0.12); animation: robot-squash 1.1s ease-in-out infinite; }
-@keyframes robot-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20%); } }
-@keyframes robot-squash { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(0.7); opacity: 0.25; } }
-/* The global 0.01ms rule would make an infinite loop flicker, so stop it outright. */
-@media (prefers-reduced-motion: reduce) {
-  .robot-bounce, .robot-bounce rect.eye, .robot-bounce-shadow { animation: none !important; }
-}
-
-/* Greeting robot sitting on the "M" of Max: legs swing out of step, eyes blink. Asked for by the
-   owner as the dashboard's mascot moment; it is the only looping motion inside the app. */
-.robot-sit rect.leg { transform-box: fill-box; transform-origin: 50% 0%; animation: leg-swing 2.4s ease-in-out infinite; }
-.robot-sit rect.leg.right { animation-delay: -1.2s; }
-.robot-sit rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 3.2s ease-in-out infinite; }
-.robot-sit rect.eye.right { animation-delay: 0.05s; }
-@keyframes leg-swing { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-14deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .robot-sit rect.leg, .robot-sit rect.eye { animation: none !important; }
-}
-
-/* Tap the greeting robot: one-off reactions, cycled per tap. */
-.robot-react-spin { animation: robot-spin 600ms cubic-bezier(0.34, 1.56, 0.64, 1); }
-.robot-react-hop { animation: robot-hop 600ms cubic-bezier(0.34, 1.56, 0.64, 1); }
-.robot-react-love { animation: robot-love 600ms ease-out; }
-@keyframes robot-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-@keyframes robot-hop { 0%, 100% { transform: translateY(0) scale(1); } 20% { transform: translateY(8%) scale(1.1, 0.85); } 50% { transform: translateY(-55%) scale(0.95, 1.08); } }
-@keyframes robot-love { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.25); } 60% { transform: scale(0.95); } }
-
-/* All-paid robot: jumps twice then rests, right arm waving throughout. */
-.robot-cheer { animation: robot-cheer 2.4s ease-in-out infinite; transform-origin: bottom center; }
-.robot-cheer rect.arm.right { transform-box: fill-box; transform-origin: 0% 50%; animation: robot-wave 1.5s ease-in-out infinite; }
-.robot-cheer rect.eye { transform-box: fill-box; transform-origin: 50% 50%; animation: robot-blink 2.6s ease-in-out infinite; }
-@keyframes robot-cheer { 0%, 40%, 100% { transform: translateY(0); } 10%, 30% { transform: translateY(-18%); } 20% { transform: translateY(0) scale(1.06, 0.94); } }
-.sparkle { animation: sparkle 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-.sparkle.late { animation-delay: 0.6s; }
-.sparkle.later { animation-delay: 1.2s; }
-@keyframes sparkle { 0%, 100% { transform: scale(0.4); opacity: 0.3; } 50% { transform: scale(1); opacity: 1; } }
-
-/* Mark-paid: coins pop out of the check button, the check draws itself in. */
-.coin { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 9999px;
-  animation: coin-pop 600ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
-@keyframes coin-pop {
-  0% { transform: translate(0, 0) scale(0.4); opacity: 1; }
-  70% { opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; }
-}
-.check-draw path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: check-draw 300ms ease-out 80ms forwards; }
-@keyframes check-draw { to { stroke-dashoffset: 0; } }
-
-@media (prefers-reduced-motion: reduce) {
-  .robot-cheer, .robot-cheer rect.arm, .robot-cheer rect.eye, .sparkle,
-  .robot-react-spin, .robot-react-hop, .robot-react-love, .coin { animation: none !important; }
-  .coin { display: none; }
-  .check-draw path { animation: none !important; stroke-dashoffset: 0; }
-}
-
-/* Sheets (native <dialog>) slide up on phones and fade in from md up, on open only: closing
-   unmounts their content, so an exit animation would slide an empty panel. 200ms standard
-   cubic-bezier matches the app's transition duration and GPU-composes on transform/opacity. */
-dialog.sheet {
-  will-change: transform, opacity;
-}
+/* Sheets (native <dialog>) slide up on phones and pop in from md up, on open only. */
 dialog.sheet[open] {
   animation: sheet-up 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -207,64 +113,60 @@ dialog.sheet[open]::backdrop {
   from { opacity: 0; }
 }
 
-/* Phone side menu slides in from the left edge, where its ☰ button sits. */
-dialog.side-menu[open] {
-  animation: side-in 220ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-dialog.side-menu[open]::backdrop {
-  animation: sheet-fade 220ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes side-in {
-  from { transform: translateX(-100%); }
-}
-
-/* Page gutters that clear the notch/rounded corners once viewport-fit=cover is on (landscape sides, standalone top). */
+/* Page gutters that clear the notch/rounded corners once viewport-fit=cover is on. */
 @utility safe-gutter {
   padding-top: max(1rem, env(safe-area-inset-top));
   padding-left: max(1rem, env(safe-area-inset-left));
   padding-right: max(1rem, env(safe-area-inset-right));
 }
 
-/* Cards sit flat on the white page with a hairline border: no shadow, since nothing on a
-   dashboard needs to float above anything else. */
+/* The card: outlined with a hard offset shadow, so it reads as a solid object on the desk. */
 @utility card {
-  @apply rounded-[20px] border border-line p-5;
+  @apply rounded-[4px] border-[1.5px] border-ink bg-card p-4 shadow-[4px_4px_0_var(--color-ink)];
+}
+/* Anything tappable that looks like a card sinks into its shadow when pressed. */
+@utility press {
+  @apply transition-[translate,box-shadow] duration-100 active:translate-x-[3px] active:translate-y-[3px] active:shadow-[1px_1px_0_var(--color-ink)];
 }
 @utility btn {
-  @apply inline-flex cursor-pointer items-center justify-center gap-2 min-h-11 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors duration-200 disabled:opacity-50;
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 min-h-11 rounded-[4px] border-[1.5px] border-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] shadow-[3px_3px_0_var(--color-ink)] transition-[translate,box-shadow,background-color] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--color-ink)] disabled:translate-0 disabled:opacity-50 disabled:shadow-none;
 }
-/* The accent lives here: the one action per screen that moves things forward. */
+/* Navy: the one action per screen that moves things forward. */
 @utility btn-primary {
-  @apply btn bg-terra-strong text-white hover:bg-[#8A4633];
+  @apply btn bg-navy text-white hover:bg-navy-hover;
 }
 @utility btn-secondary {
-  @apply btn border border-line bg-white text-ink hover:bg-cream;
+  @apply btn bg-card text-ink hover:bg-cream;
 }
 @utility btn-sm {
-  @apply min-h-11 px-4 py-1.5 text-xs md:min-h-9;
+  @apply min-h-11 px-3 py-1.5 text-[0.7rem] md:min-h-9;
 }
+/* Status chip: a small outlined uppercase tag, like a stamped label. */
 @utility pill {
-  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;
+  @apply inline-flex items-center gap-1 rounded-[3px] border-[1.5px] border-current px-1.5 py-0.5 text-[0.68rem] leading-tight font-semibold uppercase tracking-[0.08em] whitespace-nowrap;
 }
 @utility field {
-  @apply w-full rounded-xl border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-ink;
+  @apply w-full rounded-[4px] border-[1.5px] border-ink bg-card px-3.5 py-2.5 text-sm outline-none transition-shadow duration-100 focus:shadow-[3px_3px_0_var(--color-ink)];
 }
 @utility label {
-  @apply mb-1.5 block text-xs font-semibold text-ink-soft;
+  @apply mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-soft;
+}
+/* Section labels over a rule: small, uppercase, spaced. */
+@utility eyebrow {
+  @apply text-[0.68rem] leading-tight font-semibold uppercase tracking-[0.12em];
 }
 @utility h-display {
-  @apply font-display font-bold tracking-tight;
-}
-@utility font-splash {
-  font-family: var(--font-gelasio), Georgia, serif;
+  @apply font-display font-medium tracking-[-0.02em];
 }
 
-/* Toast: rises in from the bottom, leaves faster than it came. */
-.toast-in { animation: toast-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* Toast: rises in from the bottom. */
+.toast-in { animation: toast-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes toast-in { from { transform: translateY(16px); opacity: 0; } }
 
-/* New-month card: the robot hops once when the card appears. */
-.robot-hello { animation: robot-hop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both; transform-origin: 50% 90%; }
+/* Rent bar: paid segments fill in room order on load. */
+.seg-fill { animation: seg-fill 260ms ease-out both; transform-origin: left; }
+@keyframes seg-fill { from { transform: scaleX(0); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .toast-in, .robot-hello { animation: none !important; }
+  .toast-in, .seg-fill { animation: none !important; }
 }

@@ -7,11 +7,11 @@ import { daysBetween } from "./format";
 export const REPEAT_OPTIONS: Repeat[] = ["NONE", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"];
 
 export const REPEAT_LABEL: Record<Repeat, string> = {
-  NONE: "Once",
-  WEEKLY: "Every week",
-  BIWEEKLY: "Every 2 weeks",
-  MONTHLY: "Every month",
-  YEARLY: "Every year",
+  NONE: "Sekali",
+  WEEKLY: "Tiap minggu",
+  BIWEEKLY: "Tiap 2 minggu",
+  MONTHLY: "Tiap bulan",
+  YEARLY: "Tiap tahun",
 };
 
 // Each reminder picks how many days ahead its push alert fires (remindBefore); it also fires on the
@@ -19,9 +19,9 @@ export const REPEAT_LABEL: Record<Repeat, string> = {
 export const REMIND_OPTIONS = [0, 1, 2, 3, 7];
 
 export function remindLabel(days: number) {
-  if (days === 0) return "On the day";
-  if (days === 7) return "1 week before";
-  return `${days} day${days > 1 ? "s" : ""} before`;
+  if (days === 0) return "Pada harinya";
+  if (days === 7) return "1 minggu sebelumnya";
+  return `${days} hari sebelumnya`;
 }
 
 // The next due date after `due` for a repeating reminder. Monthly and yearly keep the day of the
@@ -43,9 +43,9 @@ export function daysUntil(due: Date | null, today: Date) {
 }
 
 export function dueLabel(days: number | null) {
-  if (days === null) return "No date";
-  if (days < 0) return `${-days} day${days < -1 ? "s" : ""} late`;
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  return `In ${days} days`;
+  if (days === null) return "Tanpa tanggal";
+  if (days < 0) return `Telat ${-days} hari`;
+  if (days === 0) return "Hari ini";
+  if (days === 1) return "Besok";
+  return `${days} hari lagi`;
 }
