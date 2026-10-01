@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { addRecipient, toggleRecipient, updateRecipientBank } from "@/app/actions";
 import { PageHeader, Section } from "@/components/ui";
-import { SubmitButton } from "@/components/forms";
+import { AmountInput, SubmitButton } from "@/components/forms";
+import { rupiah } from "@/lib/format";
 import { BankAccount } from "@/components/bank";
 import { SwitchSubmit } from "@/components/kit-client";
 import { IconPlus } from "@/components/icons";
@@ -19,7 +20,7 @@ export default async function SettingsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className={`text-sm font-semibold ${r.isActive ? "" : "text-ink-soft line-through"}`}>{r.name}</div>
-                    <div className="text-xs text-ink-soft">{[r.role, r.isActive ? "Active" : "Inactive"].filter(Boolean).join(" · ")}</div>
+                    <div className="text-xs text-ink-soft">{[r.role, r.monthlyAmount ? rupiah(r.monthlyAmount) : null, r.isActive ? "Active" : "Inactive"].filter(Boolean).join(" · ")}</div>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
                     <BankAccount bank={r.bankName} account={r.accountNumber} holder={r.accountHolder} />
@@ -31,7 +32,7 @@ export default async function SettingsPage() {
                 </div>
                 <details className="mt-1.5">
                   <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-semibold text-ink-soft hover:text-ink">
-                    {r.accountNumber ? "Edit bank account" : "Add bank account"}
+                    Edit amount and bank account
                   </summary>
                   <form action={updateRecipientBank} className="mt-2 grid grid-cols-[6rem_minmax(0,1fr)] gap-2 sm:grid-cols-[6rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <input type="hidden" name="id" value={r.id} />
@@ -40,6 +41,8 @@ export default async function SettingsPage() {
                       aria-label={`Account number for ${r.name}`} className="field num" />
                     <input name="accountHolder" defaultValue={r.accountHolder ?? ""} placeholder="Name on account"
                       aria-label={`Account holder for ${r.name}`} className="field col-span-2 sm:col-span-1" />
+                    <AmountInput name="monthlyAmount" defaultValue={r.monthlyAmount} placeholder="Amount sent"
+                      aria-label={`Amount sent to ${r.name}`} className="field num col-span-2 sm:col-span-3" />
                     <SubmitButton className="btn-primary btn-sm" pendingText="Saving…">Save</SubmitButton>
                   </form>
                 </details>
@@ -47,7 +50,8 @@ export default async function SettingsPage() {
             ))}
           </ul>
           <p className="mt-3 text-xs text-ink-soft">
-            Inactive recipients are left off future transfer checklists. Past transfer records are kept.
+            Ticking a transfer as sent adds the amount to that month&apos;s expenses. Inactive recipients are left off future
+            transfer checklists. Past transfer records are kept.
           </p>
         </Section>
 
@@ -77,6 +81,10 @@ export default async function SettingsPage() {
           <div>
             <label className="label" htmlFor="accountHolder">Name on account</label>
             <input id="accountHolder" name="accountHolder" className="field" />
+          </div>
+          <div>
+            <label className="label" htmlFor="monthlyAmount">Amount sent</label>
+            <AmountInput id="monthlyAmount" name="monthlyAmount" className="field num" />
           </div>
           <SubmitButton pendingText="Saving…"><IconPlus width={16} height={16} /> Add</SubmitButton>
         </form>

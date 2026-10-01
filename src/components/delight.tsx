@@ -120,6 +120,11 @@ const COINS = Array.from({ length: 10 }, (_, i) => {
   };
 });
 
+// Coins popping out of the centre of the nearest `relative` parent. Remount (key) to replay.
+export function CoinBurst() {
+  return <>{COINS.map((c, i) => <span key={i} className={`coin ${c.color}`} style={c.style} aria-hidden />)}</>;
+}
+
 export function PaidButton({ incomeId, roomNumber }: { incomeId: string; roomNumber: number }) {
   const ctx = useContext(PaidCtx);
   const form = useRef<HTMLFormElement>(null);
@@ -145,7 +150,7 @@ export function PaidButton({ incomeId, roomNumber }: { incomeId: string; roomNum
             <svg viewBox="0 0 24 24" width={20} height={20} className="check-draw" aria-hidden>
               <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {COINS.map((c, i) => <span key={i} className={`coin ${c.color}`} style={c.style} aria-hidden />)}
+            <CoinBurst />
           </>
         ) : (
           <IconCheck width={18} height={18} strokeWidth={3} />

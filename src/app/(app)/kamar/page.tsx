@@ -6,8 +6,10 @@ import { PageHeader, StatusPill, WaButton } from "@/components/ui";
 import { RoomsMobileList } from "@/components/room-drawer";
 import { SegmentedLinks } from "@/components/kit-client";
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
+import { ensureCurrentPeriod } from "@/lib/cashbook";
 
 export default async function RoomsPage({ searchParams }: PageProps<"/kamar">) {
+  await ensureCurrentPeriod();
   const { status } = await searchParams;
   const filter = STATUS_OPTIONS.includes(status as RoomStatus) ? (status as RoomStatus) : undefined;
   const [rooms, all] = await Promise.all([

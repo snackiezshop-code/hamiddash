@@ -105,3 +105,20 @@ export const EXPENSE_META: Record<ExpenseCategory, CategoryMeta> = {
   BAGI_HASIL: { tone: "blush", icon: IconCoins },
   LAINNYA: { tone: "blush", icon: IconMore },
 };
+
+// Rent collected this month as one pixel block per room that owes rent (empty and broken rooms
+// don't count; yearly payers count as paid). Blocks keep their room order, so a newly paid room
+// fills in place.
+export function RentProgress({ rooms }: { rooms: { id: string; number: number; paid: boolean }[] }) {
+  const paid = rooms.filter((r) => r.paid).length;
+  return (
+    <div role="progressbar" aria-valuemin={0} aria-valuemax={rooms.length} aria-valuenow={paid}
+      aria-label={`Rent collected: ${paid} of ${rooms.length} rooms`} className="flex gap-1">
+      {rooms.map((r, i) => (
+        <span key={r.id} title={`Room ${r.number} · ${r.paid ? "paid" : "unpaid"}`}
+          className={`h-3 min-w-0 flex-1 transition-colors duration-300 ${r.paid ? "bg-mint-deep" : "bg-cream-2"}`}
+          style={{ transitionDelay: `${i * 25}ms` }} />
+      ))}
+    </div>
+  );
+}

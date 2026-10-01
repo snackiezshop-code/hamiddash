@@ -23,6 +23,9 @@ const KATEGORI_ID: Record<ExpenseCategory, string> = {
   PENGURUS: "Pengurus", BAGI_HASIL: "Bagi hasil", LAINNYA: "Lainnya",
 };
 
+// The caretaker is named by role only.
+const isCaretaker = (role: string | null) => /pengurus|caretaker/i.test(role ?? "");
+
 export const bulanLabel = (year: number, month: number) => `${BULAN[month - 1]} ${year}`;
 const tanggal = (d: Date) => `${d.getUTCDate()} ${BULAN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 const rp = (n: number) => `${n < 0 ? "-" : ""}Rp${Math.abs(n).toLocaleString("id-ID")}`;
@@ -189,7 +192,7 @@ export function MonthlyReport({ period, summary }: { period: Period; summary: Su
             <Text style={s.h2}>Uang dikirim bulan ini</Text>
             {transfers.map((t) => (
               <View key={t.id} style={s.row}>
-                <Text>{t.recipient.name}{t.recipient.role ? <Text style={s.muted}>  ({t.recipient.role})</Text> : null}</Text>
+                <Text>{isCaretaker(t.recipient.role) ? "Pengurus" : <>{t.recipient.name}{t.recipient.role ? <Text style={s.muted}>  ({t.recipient.role})</Text> : null}</>}</Text>
                 <Text style={[s.pill, t.isSent ? { backgroundColor: C.mint, color: C.mintDeep } : { backgroundColor: C.blush, color: C.blushDeep }]}>
                   {t.isSent ? `Sudah dikirim${t.sentAt ? ` ${tanggal(new Date(t.sentAt.getTime() + 7 * 60 * 60 * 1000))}` : ""}` : "Belum dikirim"}
                   {t.amount ? ` · ${rp(t.amount)}` : ""}

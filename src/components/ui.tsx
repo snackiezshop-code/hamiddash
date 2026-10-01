@@ -92,22 +92,3 @@ export function WaButton({ phone, text, label = "WhatsApp", iconOnly = false }: 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-2xl bg-cream px-4 py-6 text-center text-sm text-ink-soft">{children}</p>;
 }
-
-export function Sparkline({ values, width = 96, height = 40 }: { values: number[]; width?: number; height?: number }) {
-  if (values.length < 2) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const pts = values.map((v, i) => [
-    (i / (values.length - 1)) * (width - 6) + 3,
-    height - 3 - ((v - min) / span) * (height - 6),
-  ]);
-  const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const [lx, ly] = pts[pts.length - 1];
-  return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
-      <path d={d} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lx} cy={ly} r={3.5} fill="currentColor" />
-    </svg>
-  );
-}

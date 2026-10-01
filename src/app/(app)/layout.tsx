@@ -1,13 +1,16 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ensureCurrentPeriod } from "@/lib/cashbook";
 import { periodLabel, periodSlug } from "@/lib/format";
 import { MobileTopBar, Sidebar } from "@/components/nav";
 import { dueItems, dueReminders } from "@/lib/reminders";
 import { todayJakarta } from "@/lib/format";
+import { Toaster } from "@/components/toast";
 import { QuickAddProvider, type QuickAddData } from "@/components/quick-add";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   await requireAdmin();
+  await ensureCurrentPeriod();
 
   const today = todayJakarta();
   const [tenants, rooms, latest, rent, own, monthReminders] = await Promise.all([
@@ -66,6 +69,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <Sidebar reminders={reminders} cashHref={cashHref} dueCount={dueCount} />
         <main className="min-w-0 flex-1 pb-[calc(3rem+env(safe-area-inset-bottom))] md:py-4 md:pr-2 md:pb-8">{children}</main>
       </div>
+      <Toaster />
     </QuickAddProvider>
   );
 }

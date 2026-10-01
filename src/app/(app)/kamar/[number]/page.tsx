@@ -7,8 +7,10 @@ import { PageHeader, Section, StatusPill, WaButton } from "@/components/ui";
 import { AmountInput, SubmitButton } from "@/components/forms";
 import { SelectPill } from "@/components/kit-client";
 import { IconChevronLeft } from "@/components/icons";
+import { ensureCurrentPeriod } from "@/lib/cashbook";
 
 export default async function RoomDetailPage({ params }: PageProps<"/kamar/[number]">) {
+  await ensureCurrentPeriod();
   const { number } = await params;
   const room = await db.room.findUnique({
     where: { number: Number(number) || 0 },

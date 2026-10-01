@@ -106,14 +106,17 @@ enum ExpenseCategory {
 }
 
 model Expense {
-  id            String          @id @default(cuid())
-  period        CashPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  periodId      String
-  category      ExpenseCategory
-  categoryLabel String? // typed-in category name when category is LAINNYA ("Other"), e.g. "PBB"
-  description   String
-  amount        Int
-  createdAt     DateTime        @default(now())
+  id              String          @id @default(cuid())
+  period          CashPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodId        String
+  category        ExpenseCategory
+  categoryLabel   String? // typed-in category name when category is LAINNYA ("Other"), e.g. "PBB"
+  description     String
+  amount          Int
+  // Set when the expense was recorded by ticking a transfer as sent; unticking removes it.
+  transferCheck   TransferCheck?  @relation(fields: [transferCheckId], references: [id], onDelete: SetNull)
+  transferCheckId String?         @unique
+  createdAt       DateTime        @default(now())
 }
 
 // Configurable list of payout recipients (caretaker, profit-share family members, bank).
@@ -124,6 +127,7 @@ model Recipient {
   bankName       String? // e.g. "BSI"
   accountNumber  String?
   accountHolder  String? // real name on the bank account
+  monthlyAmount  Int? // Rp sent each time; ticking the transfer as sent records it as an expense
   isActive       Boolean         @default(true)
   transferChecks TransferCheck[]
   createdAt      DateTime        @default(now())
@@ -139,6 +143,7 @@ model TransferCheck {
   isSent      Boolean    @default(false)
   amount      Int?
   sentAt      DateTime?
+  expense     Expense?
 
   @@unique([periodId, recipientId])
 }

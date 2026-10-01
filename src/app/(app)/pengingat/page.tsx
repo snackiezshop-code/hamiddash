@@ -9,10 +9,12 @@ import { PushToggle } from "@/components/push-toggle";
 import { QuickAddButton } from "@/components/quick-add";
 import { ReminderList, type ReminderItem } from "@/components/reminder-list";
 import { IconPlus, IconWhatsApp } from "@/components/icons";
+import { ensureCurrentPeriod } from "@/lib/cashbook";
 
 // Rent to chase (computed from tenants) and your own reminders (bills, repairs, admin).
 // The daily push alert lands here.
 export default async function RemindersPage({ searchParams }: PageProps<"/pengingat">) {
+  await ensureCurrentPeriod();
   const { status } = await searchParams;
   const showDone = status === "done";
   const today = todayJakarta();

@@ -2,6 +2,7 @@ import { dueItems, dueReminders } from "@/lib/reminders";
 import { dueLabel } from "@/lib/reminder-items";
 import { rupiah } from "@/lib/format";
 import { sendPushToAll } from "@/lib/push";
+import { ensureCurrentPeriod } from "@/lib/cashbook";
 
 // Vercel Cron (vercel.json) calls this daily at 09:00 WIB with `Authorization: Bearer $CRON_SECRET`.
 // Nothing goes to tenants: it pushes one alert to the admin's devices listing whose rent is due and which of your own reminders (bills, repairs) are due.
@@ -10,6 +11,8 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response(null, { status: 401 });
   }
+  // On the 1st this opens the new month's cash book, so rent shows as unpaid even if nobody opened the app.
+  await ensureCurrentPeriod();
 
   // Upcoming reminders alert at 3 days and on the day; overdue ones the day after, then every 3 days.
   // Your own reminders alert the day before and on the day, then the same overdue rhythm.

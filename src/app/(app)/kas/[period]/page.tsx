@@ -1,20 +1,21 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getPeriod, summarize } from "@/lib/cashbook";
+import { ensureCurrentPeriod, getPeriod, summarize } from "@/lib/cashbook";
 import {
   STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
   isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, reminderText, rupiah, shiftMonth,
 } from "@/lib/format";
 import {
-  addAdditionalIncome, deleteAdditionalIncome, startPeriod, toggleTransfer, updateRoomIncome,
+  addAdditionalIncome, deleteAdditionalIncome, startPeriod, updateRoomIncome,
 } from "@/app/actions";
 import { Empty, PageHeader, Section, StatCard, WaButton } from "@/components/ui";
 import { BankAccount } from "@/components/bank";
 import { AmountInput, AutoSubmitAmount, ConfirmButton, SubmitButton } from "@/components/forms";
 import { Avatar, CountPill, STATUS_PASTEL } from "@/components/kit";
 import { ExpenseList } from "@/components/expense-list";
-import { SegmentedLinks, SelectPill, SwitchSubmit } from "@/components/kit-client";
+import { SegmentedLinks, SelectPill } from "@/components/kit-client";
+import { TransferToggle } from "@/components/transfer-toggle";
 import { MonthSelect } from "@/components/month-select";
 import { QuickAddButton } from "@/components/quick-add";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
@@ -31,6 +32,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]["key"];
 
 export default async function CashPeriodPage({ params, searchParams }: PageProps<"/kas/[period]">) {
+  await ensureCurrentPeriod();
   const { period: slug } = await params;
   const { tab: tabParam } = await searchParams;
   const ym = parsePeriodSlug(slug);
@@ -179,7 +181,7 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
             action={<QuickAddButton kind="expense" preset={{ periodId: period.id, periodLabel: label }} className="btn-primary btn-sm shrink-0 whitespace-nowrap">
               <IconPlus width={16} height={16} /> Add expense
             </QuickAddButton>}>
-            {period.expenses.length === 0 ? <Empty>No expenses yet.</Empty> : (
+            {period.expenses.length === 0 ? <Empty>No expenses yet. Add one here, or tick a transfer as sent to record it.</Empty> : (
               <ExpenseList expenses={period.expenses} periodLabel={label} editable />
             )}
             <div className="mt-3 flex justify-between rounded-2xl bg-cream px-4 py-3 text-sm font-semibold">
@@ -253,16 +255,14 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                     t.isSent ? "bg-mint" : t.due.kind === "turn" ? "bg-butter" : isDue(t.due) ? "bg-cream" : "border border-dashed border-line"
                   }`}>
                     <div className="flex items-center gap-2">
-                      <form action={toggleTransfer}>
-                        <input type="hidden" name="id" value={t.id} />
-                        <SwitchSubmit checked={t.isSent} label={`Transfer to ${t.recipient.name} sent`} />
-                      </form>
+                      <TransferToggle variant="switch" id={t.id} sent={t.isSent} amount={t.amount ?? t.recipient.monthlyAmount} name={t.recipient.name} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold">
                           Transfer to {t.recipient.name}
                           {t.recipient.role && <span className="ml-1.5 text-xs font-normal text-ink-soft">· {t.recipient.role}</span>}
                         </div>
                         <div className="text-xs text-ink-soft">
+                          {(t.amount ?? t.recipient.monthlyAmount) ? `${rupiah((t.amount ?? t.recipient.monthlyAmount)!)} · ` : ""}
                           {t.due.kind === "later" ? `Turn in ${dueLabel(t.due)}` : dueLabel(t.due)}
                           {" · "}
                           {t.isSent && t.sentAt

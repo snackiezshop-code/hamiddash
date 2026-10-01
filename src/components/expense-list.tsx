@@ -18,34 +18,73 @@ export type ExpenseItem = {
   description: string;
   amount: number;
   createdAt: Date;
+  transferCheckId?: string | null;
 };
 
 const titleOf = (e: ExpenseItem) => (e.description && e.description !== "-" ? e.description : expenseCategoryName(e));
 
-// Each expense row opens a sheet with its full description; admins can edit or delete it from there.
+type Group = { name: string; meta: (typeof EXPENSE_META)[ExpenseCategory]; total: number; items: ExpenseItem[] };
+
+// Expenses grouped by category (a typed-in "Other" name is its own group), biggest total first, so
+// the month reads as "where did the money go". Each row opens a sheet to view, edit or delete it.
 export function ExpenseList({ expenses, periodLabel, editable }: { expenses: ExpenseItem[]; periodLabel: string; editable: boolean }) {
   const [openId, setOpenId] = useState<string | null>(null);
   // Looked up from props so the sheet shows saved changes, and closes once the expense is deleted.
   const current = expenses.find((e) => e.id === openId) ?? null;
 
+  const byName = new Map<string, Group>();
+  for (const e of expenses) {
+    const name = expenseCategoryName(e);
+    const g = byName.get(name) ?? { name, meta: EXPENSE_META[e.category], total: 0, items: [] };
+    g.total += e.amount;
+    g.items.push(e);
+    byName.set(name, g);
+  }
+  const groups = [...byName.values()].sort((a, b) => b.total - a.total);
+
+  const row = "-mx-2 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-2xl px-2 py-1.5 text-left transition-colors hover:bg-cream/70";
+
   return (
     <>
       <ul className="divide-y divide-line">
-        {expenses.map((e) => {
-          const meta = EXPENSE_META[e.category];
-          const title = titleOf(e);
-          return (
-            <li key={e.id}>
-              <button type="button" onClick={() => setOpenId(e.id)} aria-haspopup="dialog"
-                className="-mx-2 flex min-h-14 w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-cream/70">
-                <IconBadge icon={meta.icon} tone={meta.tone} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{title}</span>
-                  {title !== expenseCategoryName(e) && <span className="block truncate text-xs text-ink-soft">{expenseCategoryName(e)}</span>}
+        {groups.map((g) => {
+          const single = g.items.length === 1 ? g.items[0] : null;
+          const head = (
+            <>
+              <IconBadge icon={g.meta.icon} tone={g.meta.tone} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{single ? titleOf(single) : g.name}</span>
+                <span className="block truncate text-xs text-ink-soft">
+                  {single ? (titleOf(single) !== g.name ? g.name : formatDate(single.createdAt)) : `${g.items.length} payments`}
                 </span>
-                <span className="num shrink-0 text-sm font-semibold">{rupiah(e.amount)}</span>
-                <IconChevronRight width={16} className="shrink-0 text-ink-soft" />
-              </button>
+              </span>
+              <span className="num shrink-0 text-sm font-semibold">{rupiah(g.total)}</span>
+            </>
+          );
+          return (
+            <li key={g.name} className="py-1.5">
+              {single ? (
+                <button type="button" onClick={() => setOpenId(single.id)} aria-haspopup="dialog" className={row}>
+                  {head}
+                  <IconChevronRight width={16} className="shrink-0 text-ink-soft" />
+                </button>
+              ) : (
+                <>
+                  {/* pr-7 lines the group total up with the item amounts (they end before a chevron). */}
+                  <div className="flex min-h-11 items-center gap-3 py-1.5 pr-7">{head}</div>
+                  <ul>
+                    {g.items.map((e) => (
+                      <li key={e.id}>
+                        <button type="button" onClick={() => setOpenId(e.id)} aria-haspopup="dialog" className={`${row} pl-[60px]`}>
+                          <span className="min-w-0 flex-1 truncate text-sm">{titleOf(e)}</span>
+                          <span className="num shrink-0 text-sm text-ink-soft">{rupiah(e.amount)}</span>
+                          <IconChevronRight width={16} className="shrink-0 text-ink-soft" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </li>
           );
         })}
@@ -78,7 +117,7 @@ function ExpenseSheet({ expense, periodLabel, editable, onClose }: {
             {[
               ["Category", expenseCategoryName(e)],
               ["Cash book", periodLabel],
-              ["Recorded", formatDate(e.createdAt)],
+              ["Recorded", e.transferCheckId ? `${formatDate(e.createdAt)} · from transfer checklist` : formatDate(e.createdAt)],
             ].map(([k, v]) => (
               <div key={k} className="flex min-h-11 items-center justify-between gap-3 py-2">
                 <dt className="text-ink-soft">{k}</dt>

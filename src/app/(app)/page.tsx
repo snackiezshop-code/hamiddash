@@ -1,36 +1,37 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { getLatestPeriod, summarize } from "@/lib/cashbook";
+import { ensureCurrentPeriod, getLatestPeriod, summarize } from "@/lib/cashbook";
 import {
-  STATUS_LABEL, STATUS_TONE, TONE_CLASS, TZ, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, todayJakarta, waLink,
+  MONTHS, STATUS_LABEL, STATUS_TONE, TONE_CLASS, TZ, formatDate, periodLabel, periodSlug, reminderText, rupiah, rupiahShort, shiftMonth, todayJakarta, waLink,
 } from "@/lib/format";
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
 import { dueItems, dueReminders } from "@/lib/reminders";
 import { REPEAT_LABEL, daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
-import { startPeriod, toggleTransfer } from "@/app/actions";
-import { Empty, PageHeader, Section, Sparkline, WaButton } from "@/components/ui";
-import { Avatar, Chevron, CountPill, EXPENSE_META, IconBadge, ListRow, taskCategoryMeta } from "@/components/kit";
+import { startPeriod } from "@/app/actions";
+import { Empty, PageHeader, Section, WaButton } from "@/components/ui";
+import { Avatar, Chevron, CountPill, EXPENSE_META, IconBadge, ListRow, RentProgress, taskCategoryMeta } from "@/components/kit";
 import { CountUpRupiah, GreetingRobot, PaidButton, PaidRow } from "@/components/delight";
 import { RobotSvg, Sparkle } from "@/components/robot";
 import { SubmitButton } from "@/components/forms";
+import { NEW_MONTH_COOKIE, NewMonthCard } from "@/components/new-month";
+import { TransferToggle } from "@/components/transfer-toggle";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
 import { RoomSearch } from "@/components/room-search";
 import { RoomDrawerProvider, RoomLink } from "@/components/room-drawer";
 import { IconCalendar, IconCheck, IconChevronRight } from "@/components/icons";
 
 export default async function DashboardPage() {
+  await ensureCurrentPeriod();
   const now = todayJakarta();
-  const [latest, rooms, periods, upcoming, reminders, items] = await Promise.all([
+  const [latest, rooms, upcoming, reminders, items, cookieStore] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
-    db.cashPeriod.findMany({
-      orderBy: [{ year: "asc" }, { month: "asc" }],
-      include: { roomIncomes: true, additionalIncomes: true, expenses: true },
-    }),
     db.reminder.findMany({ where: { isDone: false }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }], take: 5 }),
     dueReminders(now),
     dueItems(now),
+    cookies(),
   ]);
   const overdueCount = reminders.filter((r) => r.daysUntilDue < 0).length;
 
@@ -39,7 +40,12 @@ export default async function DashboardPage() {
   const needsNewPeriod = !latest || latest.year * 12 + latest.month < curYear * 12 + curMonth;
 
   const summary = latest ? summarize(latest) : null;
-  const closings = periods.map((p) => summarize(p).closingBalance);
+  // The balance card compares with last month: this month's change is exactly the net cash flow.
+  const prevMonthShort = latest ? MONTHS[shiftMonth(latest.year, latest.month, -1).month - 1].slice(0, 3) : "";
+  const rentRooms = (latest?.roomIncomes ?? [])
+    .filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK")
+    .map((r) => ({ id: r.id, number: r.room.number, paid: r.status === "LUNAS" || r.status === "TAHUNAN" }));
+  const rentPaid = rentRooms.filter((r) => r.paid).length;
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
   const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
   const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
@@ -66,6 +72,9 @@ export default async function DashboardPage() {
   const mood = hour >= 4 && hour < 11 ? "morning" : hour >= 21 || hour < 4 ? "night" : "day";
 
   const latestSlug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
+  // First week of a month that has started: a welcome card, until dismissed.
+  const showNewMonth = Boolean(latest) && !needsNewPeriod && now.getUTCDate() <= 7
+    && cookieStore.get(NEW_MONTH_COOKIE)?.value !== latestSlug;
   const dueTodayIds = new Set(dueToday.map((d) => d.id));
   const attention = unpaid
     .map((inc) => ({ inc, reminderToday: dueTodayIds.has(inc.id) }))
@@ -151,6 +160,17 @@ export default async function DashboardPage() {
         actionsClassName="hidden self-start md:mt-1 md:flex"
       />
 
+      {showNewMonth && summary && (
+        <NewMonthCard periodKey={latestSlug} title={`${MONTHS[latest!.month - 1]} has started`} href={`/kas/${latestSlug}`}>
+          <p>
+            <span className="num font-semibold">{rentRooms.length - rentPaid}</span> {rentRooms.length - rentPaid === 1 ? "room" : "rooms"} to collect
+            {unpaidTotal > 0 && <> (<span className="num font-semibold">{rupiah(unpaidTotal)}</span>)</>}.
+            Opening balance <span className="num font-semibold">{rupiah(summary.openingBalance)}</span>, carried over from {MONTHS[shiftMonth(latest!.year, latest!.month, -1).month - 1]}.
+          </p>
+          {transfersDue.length > 0 && <p className="mt-0.5">Transfers due: {transfersDue.map((x) => x.t.recipient.name).join(", ")}.</p>}
+        </NewMonthCard>
+      )}
+
       {needsNewPeriod && (
         <form action={startPeriod} className="card mb-6 flex flex-wrap items-center justify-between gap-3 bg-butter text-butter-deep">
           <input type="hidden" name="year" value={curYear} />
@@ -170,7 +190,13 @@ export default async function DashboardPage() {
           {/* Who still owes rent comes first; reminder-day rooms are a subset of the unpaid ones, so they lead the list. */}
           {attention.length > 0 ? (
             <Section title="Needs attention" action={<CountPill n={attention.length} />}>
-              <p className="-mt-3 mb-2 text-xs text-ink-soft"><span className="num font-semibold text-ink">{rupiah(unpaidTotal)}</span> still to collect for {label}</p>
+              <div className="-mt-1 mb-3 flex flex-col gap-2">
+                <RentProgress rooms={rentRooms} />
+                <p className="flex flex-wrap justify-between gap-x-3 text-xs text-ink-soft">
+                  <span><span className="num font-semibold text-ink">{rentPaid}</span> of {rentRooms.length} rooms paid</span>
+                  <span><span className="num font-semibold text-ink">{rupiah(unpaidTotal)}</span> still to collect for {label}</span>
+                </p>
+              </div>
               <ul className="divide-y divide-line">
                 {attention.map(({ inc, reminderToday }) => (
                   <li key={inc.id}>
@@ -215,40 +241,44 @@ export default async function DashboardPage() {
           )}
 
           {summary && (
-            <section className="card flex min-w-0 flex-col gap-4 bg-ink text-cream" aria-labelledby="money-title">
+            <section className="card flex min-w-0 flex-col gap-4 border-transparent bg-terra-soft text-ink" aria-labelledby="money-title">
               <div>
-                <div className="flex items-end justify-between gap-3">
-                  <h2 id="money-title" className="text-xs font-semibold opacity-75">Closing balance</h2>
-                  <Sparkline values={closings.slice(-8)} height={28} />
+                <div className="flex items-center justify-between gap-3">
+                  <h2 id="money-title" className="text-xs font-semibold text-ink-soft">Closing balance · {label}</h2>
+                  <span className={`pill shrink-0 ${summary.netFlow > 0 ? "bg-mint text-mint-deep" : summary.netFlow < 0 ? "bg-blush text-blush-deep" : "bg-white text-ink-soft"}`}>
+                    {summary.netFlow === 0 ? `Same as ${prevMonthShort}` : <>
+                      <span aria-hidden>{summary.netFlow > 0 ? "▲" : "▼"}</span>
+                      <span className="sr-only">{summary.netFlow > 0 ? "Up" : "Down"}</span>{" "}
+                      <span className="num">{rupiah(Math.abs(summary.netFlow))}</span> vs {prevMonthShort}
+                    </>}
+                  </span>
                 </div>
-                <div className="num mt-1 text-2xl font-semibold tracking-tight break-words md:text-3xl">
+                <div className="num mt-1 text-3xl font-semibold tracking-tight break-words text-terra-strong md:text-4xl">
                   <CountUpRupiah from={summary.openingBalance} to={summary.closingBalance} />
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 {/* Each row opens that part of the cash book: rent, or the expense list with its details. */}
                 {([
-                  ["Income", summary.incomeTotal, "bg-mint", "rent"],
-                  ["Expenses", summary.expenseTotal, "bg-terra", "expenses"],
+                  ["Income", summary.incomeTotal, "bg-mint-deep", "rent"],
+                  ["Expenses", summary.expenseTotal, "bg-terra-strong", "expenses"],
                 ] as const).map(([name, n, bar, tab]) => (
                   <Link key={name} href={`/kas/${latestSlug}?tab=${tab}`}
-                    className="-mx-2 block rounded-2xl px-2 py-1.5 transition-colors hover:bg-cream/10">
+                    className="-mx-2 block rounded-2xl px-2 py-1.5 transition-colors hover:bg-white/60">
                     <div className="flex items-baseline justify-between gap-3 text-xs">
-                      <span className="opacity-75">{name}</span>
-                      <span className="num flex items-center gap-1 font-semibold">{rupiah(n)} <IconChevronRight width={12} height={12} className="opacity-60" /></span>
+                      <span className="text-ink-soft">{name}</span>
+                      <span className="num flex items-center gap-1 font-semibold">{rupiah(n)} <IconChevronRight width={12} height={12} className="text-ink-soft" /></span>
                     </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-cream/10" aria-hidden>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white" aria-hidden>
                       <div className={`h-full rounded-full ${bar}`}
                         style={{ width: `${(n / Math.max(summary.incomeTotal, summary.expenseTotal, 1)) * 100}%` }} />
                     </div>
                   </Link>
                 ))}
               </div>
-              <div className="flex items-center justify-between gap-3 border-t border-cream/15 pt-3 text-xs">
-                <span className="opacity-75">Net cash flow</span>
-                <span className={`pill ${summary.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
-                  {summary.netFlow >= 0 ? "+" : ""}{rupiah(summary.netFlow)}
-                </span>
+              <div className="flex items-center justify-between gap-3 border-t border-terra/25 pt-3 text-xs">
+                <span className="text-ink-soft">Opening balance</span>
+                <span className="num font-semibold">{rupiah(summary.openingBalance)}</span>
               </div>
             </section>
           )}
@@ -290,18 +320,17 @@ export default async function DashboardPage() {
               <ul className="flex flex-wrap gap-2">
                 {transfers.map(({ t, due }) => (
                   <li key={t.id}>
-                    <form action={toggleTransfer}>
-                      <input type="hidden" name="id" value={t.id} />
-                      <SubmitButton className={`pill min-h-11 cursor-pointer px-3.5 disabled:opacity-50 ${
+                    <TransferToggle variant="pill" id={t.id} sent={t.isSent} amount={t.amount ?? t.recipient.monthlyAmount} name={t.recipient.name}
+                      className={`pill min-h-11 cursor-pointer px-3.5 disabled:opacity-50 ${
                         t.isSent ? "bg-mint text-mint-deep"
                           : due.kind === "turn" ? "bg-butter text-butter-deep"
                           : isDue(due) ? "bg-cream text-ink-soft"
                           : "border border-dashed border-line text-ink-soft"
                       }`}>
-                        {t.isSent ? "✓" : "○"} {t.recipient.name}
-                        <span className="font-medium opacity-75">· {dueLabel(due)}</span>
-                      </SubmitButton>
-                    </form>
+                      {t.isSent ? <IconCheck width={12} height={12} /> : <span className="inline-block h-3 w-3 rounded-full border-2 border-current" aria-hidden />}
+                      {t.recipient.name}
+                      <span className="font-medium opacity-75">· {dueLabel(due)}</span>
+                    </TransferToggle>
                   </li>
                 ))}
               </ul>

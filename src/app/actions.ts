@@ -19,6 +19,7 @@ const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const optStr = (f: FormData, k: string) => str(f, k) || null;
 const optDate = (f: FormData, k: string) => (str(f, k) ? new Date(str(f, k)) : null);
 const optAccount = (f: FormData) => str(f, "accountNumber").replace(/\s/g, "") || null;
+const optAmount = (f: FormData) => parseAmount(f.get("monthlyAmount")) || null;
 const optReminderDay = (f: FormData, k: string) => {
   const n = Number(str(f, k));
   return Number.isInteger(n) && n >= 1 && n <= 31 ? n : null;
@@ -248,14 +249,36 @@ export async function deleteExpense(form: FormData) {
   refresh();
 }
 
+// Ticking a transfer as sent records it as an expense of that month (caretaker fee or the heirs'
+// profit share); unticking removes that expense again.
 export async function toggleTransfer(form: FormData) {
   await requireAdmin();
-  const check = await db.transferCheck.findUniqueOrThrow({ where: { id: str(form, "id") } });
-  await db.transferCheck.update({
-    where: { id: check.id },
-    data: { isSent: !check.isSent, sentAt: check.isSent ? null : new Date() },
+  const check = await db.transferCheck.findUniqueOrThrow({
+    where: { id: str(form, "id") },
+    include: { recipient: true, period: true, expense: true },
   });
+  const sending = !check.isSent;
+  const amount = check.amount ?? check.recipient.monthlyAmount ?? 0;
+  await db.$transaction(async (tx) => {
+    await tx.transferCheck.update({
+      where: { id: check.id },
+      data: { isSent: sending, sentAt: sending ? new Date() : null },
+    });
+    if (!sending && check.expense) await tx.expense.delete({ where: { id: check.expense.id } });
+    if (sending && !check.expense && amount > 0) {
+      await tx.expense.create({ data: { periodId: check.periodId, transferCheckId: check.id, amount, ...transferExpense(check.recipient) } });
+    }
+  });
+  await recarryBalances(check.period.year, check.period.month);
   refresh();
+}
+
+function transferExpense(r: { name: string; role: string | null }) {
+  const role = r.role ?? "";
+  // The caretaker is named by role only: the report goes to the family group.
+  if (/pengurus|caretaker/i.test(role)) return { category: "PENGURUS" as const, categoryLabel: null, description: "Transfer ke pengurus" };
+  if (/pewaris|heir/i.test(role)) return { category: "BAGI_HASIL" as const, categoryLabel: null, description: `Transfer ke ${r.name}` };
+  return { category: "LAINNYA" as const, categoryLabel: role || "Transfer", description: `Transfer ke ${r.name}` };
 }
 
 // ---------- Reminders (bills, repairs, admin) ----------
@@ -353,7 +376,10 @@ export async function addRecipient(form: FormData) {
   const name = str(form, "name");
   if (!name) return;
   const r = await db.recipient.create({
-    data: { name, role: optStr(form, "role"), bankName: optStr(form, "bankName"), accountNumber: optAccount(form), accountHolder: optStr(form, "accountHolder") },
+    data: {
+      name, role: optStr(form, "role"), bankName: optStr(form, "bankName"), accountNumber: optAccount(form),
+      accountHolder: optStr(form, "accountHolder"), monthlyAmount: optAmount(form),
+    },
   });
   await ensureTransferCheck(r.id);
   refresh();
@@ -363,7 +389,7 @@ export async function updateRecipientBank(form: FormData) {
   await requireAdmin();
   await db.recipient.update({
     where: { id: str(form, "id") },
-    data: { bankName: optStr(form, "bankName"), accountNumber: optAccount(form), accountHolder: optStr(form, "accountHolder") },
+    data: { bankName: optStr(form, "bankName"), accountNumber: optAccount(form), accountHolder: optStr(form, "accountHolder"), monthlyAmount: optAmount(form) },
   });
   refresh();
 }

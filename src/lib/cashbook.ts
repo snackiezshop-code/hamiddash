@@ -1,6 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "./db";
-import { shiftMonth } from "./format";
+import { shiftMonth, todayJakarta } from "./format";
 
 type PeriodTotalsInput = {
   openingBalance: number;
@@ -88,6 +89,27 @@ export async function createPeriod(year: number, month: number) {
     },
   });
 }
+
+// A new month starts by itself: once the Jakarta calendar passes into a month with no cash book,
+// every missing month up to now is created and paid rooms switch back to unpaid.
+// Called from the app layout, the pages that show room status, and the daily cron; cached per request.
+export const ensureCurrentPeriod = cache(async () => {
+  const today = todayJakarta();
+  const now = { year: today.getUTCFullYear(), month: today.getUTCMonth() + 1 };
+  const latest = await db.cashPeriod.findFirst({ orderBy: [{ year: "desc" }, { month: "desc" }], select: { year: true, month: true } });
+  if (!latest) return;
+  let next = shiftMonth(latest.year, latest.month, 1);
+  while (next.year * 12 + next.month <= now.year * 12 + now.month) {
+    try {
+      await createPeriod(next.year, next.month);
+      await db.room.updateMany({ where: { status: "LUNAS" }, data: { status: "TUNDA_BAYAR" } });
+    } catch (e) {
+      // Another request created this month first (unique year+month); carry on.
+      if ((e as { code?: string }).code !== "P2002") throw e;
+    }
+    next = shiftMonth(next.year, next.month, 1);
+  }
+});
 
 export async function isLatestPeriod(periodId: string) {
   const latest = await db.cashPeriod.findFirst({
