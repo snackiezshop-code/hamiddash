@@ -37,7 +37,7 @@ function dueTone(days: number | null) {
   return "bg-cream text-ink-soft";
 }
 
-// Open reminders: tap a row to edit it, Done/Paid on the right. Done ones: Undo instead.
+// Open reminders: tap a row to edit it, Selesai/Dibayar on the right. Done ones: Batalkan instead.
 export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: { id: string; number: number }[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const current = items.find((r) => r.id === openId) ?? null;
@@ -50,18 +50,18 @@ export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: {
           const details = [
             r.amount ? rupiah(r.amount) : null,
             r.repeat !== "NONE" ? REPEAT_LABEL[r.repeat] : null,
-            r.roomNumber ? `Room ${r.roomNumber}` : null,
+            r.roomNumber ? `Kamar ${r.roomNumber}` : null,
           ].filter(Boolean).join(" · ");
           return (
             <li key={r.id} className="flex items-center gap-2 py-1">
               <button type="button" onClick={() => setOpenId(r.id)} aria-haspopup="dialog"
-                className="-ml-2 flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors duration-200 hover:bg-cream">
+                className="-ml-2 flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[4px] px-2 py-1.5 text-left transition-colors duration-200 hover:bg-cream">
                 <IconBadge icon={meta.icon} tone={meta.tone} />
                 <span className="min-w-0 flex-1">
-                  <span className={`block text-sm font-semibold break-words ${r.isDone ? "text-ink-soft line-through" : ""}`}>{r.title}</span>
+                  <span className={`block text-sm font-medium break-words ${r.isDone ? "text-ink-soft line-through" : ""}`}>{r.title}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-ink-soft">
                     {r.isDone
-                      ? <span>Done {formatDate(r.doneAt)}</span>
+                      ? <span>Selesai {formatDate(r.doneAt)}</span>
                       : <span className={`pill py-0 ${dueTone(r.daysUntilDue)}`}>
                           {r.daysUntilDue !== null && r.daysUntilDue > 1 ? formatDate(r.dueDate) : dueLabel(r.daysUntilDue)}
                         </span>}
@@ -84,14 +84,14 @@ export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: {
 function DoneButton({ item }: { item: ReminderItem }) {
   const [asking, setAsking] = useState(false);
   const isBill = Boolean(item.amount || item.category);
-  const label = isBill ? "Paid" : "Done";
-  const buttonClass = "btn btn-sm border border-line bg-white text-ink hover:bg-mint hover:text-mint-deep";
+  const label = isBill ? "Dibayar" : "Selesai";
+  const buttonClass = "btn-secondary btn-sm";
 
   if (isBill && !item.amount) {
     return (
       <>
         <button type="button" onClick={() => setAsking(true)} aria-haspopup="dialog" className={`${buttonClass} shrink-0`}
-          aria-label={`Mark "${item.title}" paid`}>
+          aria-label={`Tandai "${item.title}" dibayar`}>
           <IconCheck width={16} /> {label}
         </button>
         <PaySheet key={String(asking)} item={item} open={asking} onClose={() => setAsking(false)} />
@@ -106,7 +106,7 @@ function CompleteForm({ item, label, buttonClass }: { item: ReminderItem; label:
   return (
     <form action={action} className="flex shrink-0 flex-col items-end gap-1">
       <input type="hidden" name="id" value={item.id} />
-      <SubmitButton className={buttonClass} pendingText="Saving…" aria-label={`Mark "${item.title}" ${label.toLowerCase()}`}>
+      <SubmitButton className={buttonClass} pendingText="Menyimpan…" aria-label={`Tandai "${item.title}" ${label.toLowerCase()}`}>
         <IconCheck width={16} /> {label}
       </SubmitButton>
       {error && <p role="alert" className="max-w-44 text-right text-xs font-semibold text-blush-deep">{error}</p>}
@@ -117,7 +117,7 @@ function CompleteForm({ item, label, buttonClass }: { item: ReminderItem; label:
 function PaySheet({ item, open, onClose }: { item: ReminderItem; open: boolean; onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   return (
-    <Sheet open={open} onClose={onClose} title={`Pay ${item.title}`}>
+    <Sheet open={open} onClose={onClose} title={`Bayar ${item.title}`}>
       <form className="flex flex-col gap-4"
         action={async (fd) => {
           setError(null);
@@ -127,19 +127,19 @@ function PaySheet({ item, open, onClose }: { item: ReminderItem; open: boolean; 
             else onClose();
           } catch (err) {
             reportClientIssue("form-save-failed", { form: "Pay reminder", ...errorDetails(err) });
-            setError("Couldn't save. Check your connection and try again.");
+            setError("Gagal menyimpan. Periksa koneksi, lalu coba lagi.");
           }
         }}>
         <input type="hidden" name="id" value={item.id} />
-        <Field label="Amount paid (Rp)" htmlFor={`pay-${item.id}`}>
+        <Field label="Jumlah dibayar (Rp)" htmlFor={`pay-${item.id}`}>
           <AmountInput id={`pay-${item.id}`} name="amount" required pattern="[0-9.,\s]*[1-9][0-9.,\s]*"
-            title="Enter an amount above 0" placeholder="e.g. 385.000" className="field num" />
+            title="Isi jumlah lebih dari 0" placeholder="385.000" className="field num" />
         </Field>
         <p className="-mt-2 text-xs text-ink-soft">
-          Goes into this month&apos;s expenses{item.repeat !== "NONE" ? `, then the reminder moves on to its next date` : ""}.
+          Masuk ke pengeluaran bulan ini{item.repeat !== "NONE" ? `, lalu pengingat pindah ke tanggal berikutnya` : ""}.
         </p>
-        {error && <p role="alert" className="rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
-        <SubmitButton className="btn-primary w-full" pendingText="Saving…">Save payment</SubmitButton>
+        {error && <p role="alert" className="rounded-[4px] border-[1.5px] border-blush-deep bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+        <SubmitButton className="btn-primary w-full" pendingText="Menyimpan…">Simpan pembayaran</SubmitButton>
       </form>
     </Sheet>
   );
@@ -149,8 +149,8 @@ function UndoButton({ id, title }: { id: string; title: string }) {
   return (
     <form action={reopenReminder} className="shrink-0">
       <input type="hidden" name="id" value={id} />
-      <SubmitButton className="btn btn-sm border border-line bg-white text-ink hover:bg-cream" pendingText="…" aria-label={`Undo "${title}"`}>
-        <IconUndo width={16} /> Undo
+      <SubmitButton className="btn-secondary btn-sm" pendingText="…" aria-label={`Batalkan selesai "${title}"`}>
+        <IconUndo width={16} /> Batalkan
       </SubmitButton>
     </form>
   );
@@ -159,7 +159,7 @@ function UndoButton({ id, title }: { id: string; title: string }) {
 function ReminderSheet({ item, rooms, onClose }: { item: ReminderItem | null; rooms: { id: string; number: number }[]; onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   return (
-    <Sheet open={Boolean(item)} onClose={onClose} title="Edit reminder">
+    <Sheet open={Boolean(item)} onClose={onClose} title="Edit pengingat">
       {item && (
         <div className="flex flex-col gap-4">
           <form className="flex flex-col gap-4"
@@ -171,7 +171,7 @@ function ReminderSheet({ item, rooms, onClose }: { item: ReminderItem | null; ro
                 else onClose();
               } catch (err) {
                 reportClientIssue("form-save-failed", { form: "Edit reminder", ...errorDetails(err) });
-                setError("Couldn't save. Check your connection and try again.");
+                setError("Gagal menyimpan. Periksa koneksi, lalu coba lagi.");
               }
             }}>
             <input type="hidden" name="id" value={item.id} />
@@ -179,14 +179,14 @@ function ReminderSheet({ item, rooms, onClose }: { item: ReminderItem | null; ro
               title: item.title, dueDate: dateInputValue(item.dueDate), repeat: item.repeat, remindBefore: item.remindBefore,
               amount: item.amount, category: item.category, tag: item.tag, roomId: item.roomId,
             }} />
-            {error && <p role="alert" className="rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
-            <SubmitButton className="btn-primary w-full" pendingText="Saving…">Save changes</SubmitButton>
+            {error && <p role="alert" className="rounded-[4px] border-[1.5px] border-blush-deep bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+            <SubmitButton className="btn-primary w-full" pendingText="Menyimpan…">Simpan perubahan</SubmitButton>
           </form>
           <form action={deleteReminder} className="flex justify-center">
             <input type="hidden" name="id" value={item.id} />
-            <ConfirmButton message={`Delete reminder "${item.title}"?`} aria-label={`Delete reminder ${item.title}`}
-              className="btn btn-sm cursor-pointer text-ink-soft hover:bg-blush hover:text-blush-deep">
-              <IconTrash width={16} height={16} /> Delete reminder
+            <ConfirmButton message={`Hapus pengingat "${item.title}"?`} aria-label={`Hapus pengingat ${item.title}`}
+              className="btn-secondary btn-sm">
+              <IconTrash width={16} /> Hapus pengingat
             </ConfirmButton>
           </form>
         </div>

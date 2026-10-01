@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { ensureCurrentPeriod, getPeriod, summarize } from "@/lib/cashbook";
 import {
   STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
-  isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, reminderText, rupiah, shiftMonth,
+  isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, properName, reminderText, rupiah, shiftMonth,
 } from "@/lib/format";
 import {
   addAdditionalIncome, deleteAdditionalIncome, startPeriod, updateRoomIncome,
@@ -12,22 +12,19 @@ import {
 import { Empty, PageHeader, Section, StatCard, WaButton } from "@/components/ui";
 import { BankAccount } from "@/components/bank";
 import { AmountInput, AutoSubmitAmount, ConfirmButton, SubmitButton } from "@/components/forms";
-import { Avatar, CountPill, STATUS_PASTEL } from "@/components/kit";
 import { ExpenseList } from "@/components/expense-list";
 import { SegmentedLinks, SelectPill } from "@/components/kit-client";
 import { TransferToggle } from "@/components/transfer-toggle";
 import { MonthSelect } from "@/components/month-select";
 import { QuickAddButton } from "@/components/quick-add";
 import { dueLabel, dueOrder, isDue, transferDue } from "@/lib/transfers";
-import {
-  IconCheck, IconReceipt, IconChevronLeft, IconChevronRight, IconDownload, IconPlus, IconTrash, IconWallet,
-} from "@/components/icons";
+import { IconChevronLeft, IconChevronRight, IconDownload, IconPlus, IconTrash } from "@/components/icons";
 
 const TABS = [
-  { key: "summary", label: "Summary" },
-  { key: "rent", label: "Rent" },
-  { key: "expenses", label: "Expenses" },
-  { key: "transfers", label: "Transfers" },
+  { key: "summary", label: "Ringkasan" },
+  { key: "rent", label: "Sewa" },
+  { key: "expenses", label: "Pengeluaran" },
+  { key: "transfers", label: "Transfer" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
@@ -53,168 +50,109 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
 
   const monthOptions = allPeriods.map((p) => ({ value: periodSlug(p.year, p.month), label: periodLabel(p.year, p.month) }));
   if (!monthOptions.some((o) => o.value === slug)) {
-    monthOptions.unshift({ value: slug, label: `${label} (not started)` });
+    monthOptions.unshift({ value: slug, label: `${label} (belum dimulai)` });
   }
 
-  // Phones pick a month from the pill; desktop keeps the arrow stepper.
+  const step = "press grid h-12 w-12 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink bg-card shadow-[2px_2px_0_var(--color-ink)] hover:bg-cream";
   const nav = (
-    <>
-      <div className="flex w-full md:hidden">
-        <MonthSelect options={monthOptions} value={slug} hrefTemplate={`/kas/:month?tab=${tab}`} />
-      </div>
-      <div className="hidden items-center gap-1 md:flex">
-        <Link href={`/kas/${periodSlug(prev.year, prev.month)}`} className="btn-secondary btn-sm" aria-label="Previous month">
-          <IconChevronLeft width={16} height={16} />
+    <div className="mb-4 flex items-center gap-2">
+      <Link href={`/kas/${periodSlug(prev.year, prev.month)}?tab=${tab}`} className={step} aria-label="Bulan sebelumnya">
+        <IconChevronLeft width={18} />
+      </Link>
+      <MonthSelect options={monthOptions} value={slug} hrefTemplate={`/kas/:month?tab=${tab}`} />
+      {nextOpen ? (
+        <Link href={`/kas/${periodSlug(next.year, next.month)}?tab=${tab}`} className={step} aria-label="Bulan berikutnya">
+          <IconChevronRight width={18} />
         </Link>
-        {nextOpen ? (
-          <Link href={`/kas/${periodSlug(next.year, next.month)}`} className="btn-secondary btn-sm" aria-label="Next month">
-            <IconChevronRight width={16} height={16} />
-          </Link>
-        ) : (
-          <span className="btn-secondary btn-sm cursor-not-allowed opacity-40" aria-disabled="true" title="Next month hasn't started yet">
-            <IconChevronRight width={16} height={16} />
-          </span>
-        )}
-      </div>
-    </>
+      ) : (
+        <span className={`${step} cursor-not-allowed opacity-40`} aria-disabled="true" title="Bulan depan belum dimulai">
+          <IconChevronRight width={18} />
+        </span>
+      )}
+    </div>
   );
 
   if (!period) {
     return (
       <>
-        <PageHeader title="Cash Book" subtitle={label} actions={nav} actionsClassName="w-full md:w-auto" />
-        <form action={startPeriod} className="card bg-white text-center">
+        <PageHeader eyebrow={label} title="Buku kas" />
+        {nav}
+        <form action={startPeriod} className="card">
           <input type="hidden" name="year" value={year} />
           <input type="hidden" name="month" value={month} />
-          <p className="mx-auto mb-4 max-w-md text-sm text-ink-soft">
-            There is no cash book for {label} yet. When you start it, the closing balance of {periodLabel(prev.year, prev.month)} becomes its
-            opening balance, and every room marked Paid switches back to <b>Unpaid</b> until this month&apos;s rent comes in.
+          <p className="eyebrow text-ink-soft">Belum dimulai</p>
+          <p className="mt-2 text-sm">
+            Buku kas {label} belum ada. Saat dimulai, saldo akhir {periodLabel(prev.year, prev.month)} jadi saldo awalnya, dan
+            setiap kamar yang lunas kembali jadi <b>belum bayar</b> sampai sewa bulan ini masuk.
           </p>
-          <SubmitButton pendingText="Creating…">Start {label} cash book</SubmitButton>
+          <SubmitButton className="btn-primary mt-4 w-full" pendingText="Membuat…">Mulai buku kas {label}</SubmitButton>
         </form>
       </>
     );
   }
 
   const s = summarize(period);
-  const paidCount = period.roomIncomes.filter((r) => r.status === "LUNAS").length;
-  // Max and BNI every month, plus the heir whose turn it is; the other heirs are listed after, faded.
+  const paidCount = period.roomIncomes.filter((r) => r.status === "LUNAS" || r.status === "TAHUNAN").length;
+  // The monthly recipients plus the heir whose turn it is first; the other heirs after, faded.
   const transfers = period.transferChecks
     .filter((t) => t.recipient.isActive || t.isSent)
     .map((t) => ({ ...t, due: transferDue(t.recipientId, year, month) }))
     .sort((a, b) => dueOrder(a.due) - dueOrder(b.due));
-  // On phones only the chosen tab's sections show; from md up everything shows as before.
-  const on = (key: Tab, grid = false) =>
-    tab === key ? (grid ? "grid" : "block") : grid ? "hidden md:grid" : "hidden md:block";
+  const unsent = transfers.filter((t) => isDue(t.due) && !t.isSent).length;
 
   return (
     <>
-      <PageHeader title="Cash Book" subtitle={`Cash flow report · ${label}`} actionsClassName="w-full md:w-auto"
-        actions={<>
-          {nav}
-          <a href={`/kas/${slug}/report`} className="btn-secondary btn-sm"><IconDownload width={16} height={16} /> Download PDF</a>
-        </>} />
+      <PageHeader eyebrow={`Laporan arus kas · ${label}`} title="Buku kas"
+        actions={<a href={`/kas/${slug}/report`} className="btn-secondary btn-sm"><IconDownload width={16} /> PDF</a>} />
+      {nav}
 
-      <div className="mb-5 md:hidden">
-        <SegmentedLinks label="Cash book sections" items={TABS.map((t) => ({
-          href: `/kas/${slug}?tab=${t.key}`, label: t.label, active: tab === t.key,
+      <div className="mb-5">
+        <SegmentedLinks label="Bagian buku kas" items={TABS.map((t) => ({
+          href: `/kas/${slug}?tab=${t.key}`,
+          label: t.key === "transfers" && unsent ? `${t.label} · ${unsent}` : t.label,
+          active: tab === t.key,
         }))} />
       </div>
 
-      <div className={`mb-6 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${on("summary", true)}`}>
-        <StatCard tone="white" icon={<IconWallet />} label="Opening balance" value={rupiah(s.openingBalance)}
-          footer={<span className="text-ink-soft">Closing balance of {periodLabel(prev.year, prev.month)}</span>} />
-        <StatCard tone="mint" icon={<IconCheck />} label="Income" value={rupiah(s.incomeTotal)}
-          footer={`Rent ${rupiah(s.roomTotal)} · other ${rupiah(s.additionalTotal)}`} />
-        <StatCard tone="blush" icon={<IconReceipt />} label="Expenses" value={rupiah(s.expenseTotal)}
-          footer={`${period.expenses.length} ${period.expenses.length === 1 ? "transaction" : "transactions"}`} />
-        <StatCard tone="ink" icon={<IconWallet />} label="Closing balance" value={rupiah(s.closingBalance)}
-          footer={<span className={`pill ${s.netFlow >= 0 ? "bg-mint text-mint-deep" : "bg-blush text-blush-deep"}`}>
-            Net cash flow {s.netFlow >= 0 ? "+" : ""}{rupiah(s.netFlow)}
-          </span>} />
-      </div>
+      {tab === "summary" && (
+        <div className="flex flex-col gap-4">
+          <section className="card bg-navy text-white" aria-labelledby="closing-title">
+            <h2 id="closing-title" className="eyebrow">Saldo akhir · {label}</h2>
+            <p className="num mt-3 text-[2.4rem] leading-none font-medium tracking-[-0.03em] break-words">{rupiah(s.closingBalance)}</p>
+            <p className="mt-3 text-sm text-white/85">
+              Arus kas bersih <span className="num font-semibold text-white">{s.netFlow >= 0 ? "+" : ""}{rupiah(s.netFlow)}</span> dari saldo awal <span className="num">{rupiah(s.openingBalance)}</span>
+            </p>
+          </section>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <Section title="Room rent income" className={on("rent")}
-          action={<span className="pill bg-mint text-mint-deep">{paidCount}/{period.roomIncomes.length} paid</span>}>
-          <ul className="divide-y divide-line">
-            {period.roomIncomes.map((inc) => {
-              const tenant = inc.room.tenant;
-              return (
-                <li key={`${inc.id}-${inc.status}-${inc.amount}`}>
-                  <form action={updateRoomIncome} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
-                    <input type="hidden" name="incomeId" value={inc.id} />
-                    <Link href={`/kamar/${inc.room.number}`} className="flex min-w-0 flex-1 items-center gap-3">
-                      <Avatar name={tenant?.name ?? String(inc.room.number)} tone={STATUS_PASTEL[inc.status]} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">Room {inc.room.number}</span>
-                        <span className="block truncate text-xs text-ink-soft">{tenant?.name ?? "No tenant"}</span>
-                      </span>
-                    </Link>
-                    <SelectPill name="status" autoSubmit defaultValue={inc.status} ariaLabel={`Status of room ${inc.room.number}`}
-                      className="w-36 shrink-0" tone={TONE_CLASS[STATUS_TONE[inc.status]]}
-                      options={STATUS_OPTIONS.map((st) => ({ value: st, label: STATUS_LABEL[st] }))} />
-                    <div className="flex w-full items-center justify-end gap-2 pl-[52px] sm:w-auto sm:pl-0">
-                      {inc.status === "TUNDA_BAYAR" && (
-                        <WaButton iconOnly phone={tenant?.phone} label={`Remind ${tenant?.name ?? "tenant"} on WhatsApp`}
-                          text={reminderText({ name: tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year, month, dueDay: tenant?.reminderDay ?? null })} />
-                      )}
-                      <label className="flex min-h-11 flex-1 items-center rounded-xl border border-line bg-white px-4 focus-within:ring-2 focus-within:ring-ink sm:flex-none">
-                        <span className="mr-1 text-xs text-ink-soft">Rp</span>
-                        <AutoSubmitAmount name="amount" defaultValue={inc.amount} aria-label={`Amount for room ${inc.room.number}`}
-                          className="num w-full min-w-0 bg-transparent text-right text-sm outline-none! sm:w-24" />
-                      </label>
-                    </div>
-                  </form>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-3 flex justify-between rounded-2xl bg-cream px-4 py-3 text-sm font-semibold">
-            <span>Total room rent</span>
-            <span className="num">{rupiah(s.roomTotal)}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard tone="white" label="Pemasukan" value={rupiah(s.incomeTotal)}
+              footer={<span className="text-ink-soft">Sewa {rupiah(s.roomTotal)} · lain {rupiah(s.additionalTotal)}</span>} />
+            <StatCard tone="white" label="Pengeluaran" value={rupiah(s.expenseTotal)}
+              footer={<span className="text-ink-soft">{period.expenses.length} transaksi</span>} />
           </div>
-        </Section>
 
-        <div className="flex min-w-0 flex-col gap-4">
-          <Section title="Operating expenses" className={on("expenses")}
-            action={<QuickAddButton kind="expense" preset={{ periodId: period.id, periodLabel: label }} className="btn-primary btn-sm shrink-0 whitespace-nowrap">
-              <IconPlus width={16} height={16} /> Add expense
-            </QuickAddButton>}>
-            {period.expenses.length === 0 ? <Empty>No expenses yet. Add one here, or tick a transfer as sent to record it.</Empty> : (
-              <ExpenseList expenses={period.expenses} periodLabel={label} editable />
-            )}
-            <div className="mt-3 flex justify-between rounded-2xl bg-cream px-4 py-3 text-sm font-semibold">
-              <span>Total expenses</span>
-              <span className="num">{rupiah(s.expenseTotal)}</span>
-            </div>
-          </Section>
-
-          <section className={`card bg-ink text-cream ${on("summary")}`}>
-            <h2 className="h-display mb-3 text-lg">Cash flow summary</h2>
-            <dl className="space-y-1.5 text-sm">
+          <Section title="Rincian">
+            <dl className="text-sm">
               {[
-                ["Total room rent", s.roomTotal],
-                ["Other income", s.additionalTotal],
-                ["Total income", s.incomeTotal],
-                ["Total expenses", -s.expenseTotal],
-                ["Net cash flow", s.netFlow],
-                ["Opening balance", s.openingBalance],
+                ["Saldo awal", s.openingBalance],
+                ["Sewa kamar", s.roomTotal],
+                ["Pemasukan lain", s.additionalTotal],
+                ["Pengeluaran", -s.expenseTotal],
               ].map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3">
-                  <dt className="text-cream/70">{k}</dt>
+                <div key={k} className="flex min-h-10 items-center justify-between gap-3 border-b border-line">
+                  <dt className="text-ink-soft">{k}</dt>
                   <dd className="num">{rupiah(v as number)}</dd>
                 </div>
               ))}
-              <div className="mt-2 flex justify-between gap-3 border-t border-cream/20 pt-3 text-base font-semibold">
-                <dt>Closing balance</dt>
-                <dd className="num text-butter">{rupiah(s.closingBalance)}</dd>
+              <div className="flex min-h-12 items-center justify-between gap-3 border-t-[1.5px] border-ink font-semibold">
+                <dt>Saldo akhir</dt>
+                <dd className="num">{rupiah(s.closingBalance)}</dd>
               </div>
             </dl>
-          </section>
+          </Section>
 
-          <Section title="Other income" className={on("summary")}>
-            {period.additionalIncomes.length === 0 ? <Empty>No other income yet.</Empty> : (
+          <Section title="Pemasukan lain">
+            {period.additionalIncomes.length === 0 ? <Empty>Belum ada pemasukan lain bulan ini.</Empty> : (
               <ul className="divide-y divide-line">
                 {period.additionalIncomes.map((a) => (
                   <li key={a.id} className="flex min-h-14 items-center gap-2 py-1">
@@ -225,64 +163,126 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                     <span className="num text-sm">{rupiah(a.amount)}</span>
                     <form action={deleteAdditionalIncome}>
                       <input type="hidden" name="id" value={a.id} />
-                      <ConfirmButton message={`Delete "${a.description}"?`} aria-label={`Delete ${a.description}`}
-                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-ink-soft hover:bg-blush hover:text-blush-deep">
-                        <IconTrash width={18} height={18} />
+                      <ConfirmButton message={`Hapus "${a.description}"?`} aria-label={`Hapus ${a.description}`}
+                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-[4px] text-ink-soft hover:bg-blush hover:text-blush-deep">
+                        <IconTrash width={18} />
                       </ConfirmButton>
                     </form>
                   </li>
                 ))}
               </ul>
             )}
-            <form action={addAdditionalIncome} className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-cream p-3 sm:grid-cols-[1fr_1fr_8rem_auto]">
+            <form action={addAdditionalIncome} className="mt-4 grid grid-cols-2 gap-2 border-t-[1.5px] border-ink pt-4">
               <input type="hidden" name="periodId" value={period.id} />
-              <input name="description" required placeholder="Description" aria-label="Description" className="field col-span-2 sm:col-span-1" />
-              <input name="source" placeholder="Source" aria-label="Source" className="field" />
-              <AmountInput name="amount" required pattern="[0-9.,\s]*[1-9][0-9.,\s]*" title="Enter an amount above 0"
-                placeholder="Amount" aria-label="Amount" className="field num" />
-              <SubmitButton className="btn-primary col-span-2 sm:col-span-1" pendingText="Adding…"><IconPlus width={16} height={16} /> Add</SubmitButton>
+              <input name="description" required placeholder="Keterangan" aria-label="Keterangan" className="field col-span-2" />
+              <input name="source" placeholder="Sumber" aria-label="Sumber" className="field" />
+              <AmountInput name="amount" required pattern="[0-9.,\s]*[1-9][0-9.,\s]*" title="Isi jumlah lebih dari 0"
+                placeholder="Jumlah" aria-label="Jumlah" className="field num" />
+              <SubmitButton className="btn-primary col-span-2" pendingText="Menambah…"><IconPlus width={16} /> Tambah pemasukan</SubmitButton>
             </form>
           </Section>
+        </div>
+      )}
 
-          <Section title="Transfer checklist" className={on("transfers")}
-            action={<CountPill n={transfers.filter((t) => isDue(t.due) && !t.isSent).length} />}>
-            {transfers.length === 0 ? (
-              <Empty>No recipients yet. Add them in <Link href="/pengaturan" className="underline">Settings</Link>.</Empty>
-            ) : (
-              <ul className="space-y-2">
-                {transfers.map((t) => (
-                  <li key={t.id} className={`rounded-2xl py-1 pr-3 pl-1 ${
-                    t.isSent ? "bg-mint" : t.due.kind === "turn" ? "bg-butter" : isDue(t.due) ? "bg-cream" : "border border-dashed border-line"
-                  }`}>
+      {tab === "rent" && (
+        <Section title={`Sewa kamar · ${paidCount}/${period.roomIncomes.length} lunas`}>
+          <p className="-mt-1 mb-2 text-xs text-ink-soft">Ubah status atau jumlah; tersimpan otomatis.</p>
+          <ul className="divide-y divide-line">
+            {period.roomIncomes.map((inc) => {
+              const tenant = inc.room.tenant;
+              const name = tenant ? properName(tenant.name) : null;
+              return (
+                <li key={`${inc.id}-${inc.status}-${inc.amount}`}>
+                  <form action={updateRoomIncome} className="flex flex-col gap-2 py-3">
+                    <input type="hidden" name="incomeId" value={inc.id} />
                     <div className="flex items-center gap-2">
-                      <TransferToggle variant="switch" id={t.id} sent={t.isSent} amount={t.amount ?? t.recipient.monthlyAmount} name={t.recipient.name} />
+                      <Link href={`/kamar/${inc.room.number}`} className="flex min-w-0 flex-1 items-center gap-3">
+                        <span className="num grid h-10 w-10 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink text-sm font-medium" aria-hidden>{inc.room.number}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">Kamar {inc.room.number}</span>
+                          <span className="block truncate text-xs text-ink-soft">{name ?? "Tanpa penghuni"}</span>
+                        </span>
+                      </Link>
+                      {inc.status === "TUNDA_BAYAR" && (
+                        <WaButton iconOnly phone={tenant?.phone} label={`Kirim pengingat WhatsApp ke ${name ?? "penghuni"}`}
+                          text={reminderText({ name: tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year, month, dueDay: tenant?.reminderDay ?? null })} />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <SelectPill name="status" autoSubmit defaultValue={inc.status} ariaLabel={`Status kamar ${inc.room.number}`}
+                        className="min-w-0 flex-1" tone={`border-[1.5px] border-ink ${TONE_CLASS[STATUS_TONE[inc.status]]}`}
+                        options={STATUS_OPTIONS.map((st) => ({ value: st, label: STATUS_LABEL[st] }))} />
+                      <label className="flex min-h-11 w-36 shrink-0 items-center rounded-[4px] border-[1.5px] border-ink bg-card px-3 focus-within:shadow-[3px_3px_0_var(--color-ink)]">
+                        <span className="mr-1 text-xs text-ink-soft">Rp</span>
+                        <AutoSubmitAmount name="amount" defaultValue={inc.amount} aria-label={`Jumlah kamar ${inc.room.number}`}
+                          className="num w-full min-w-0 bg-transparent text-right text-sm outline-none!" />
+                      </label>
+                    </div>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-2 flex min-h-12 items-center justify-between border-t-[1.5px] border-ink text-sm font-semibold">
+            <span>Total sewa kamar</span>
+            <span className="num">{rupiah(s.roomTotal)}</span>
+          </div>
+        </Section>
+      )}
+
+      {tab === "expenses" && (
+        <Section title="Pengeluaran operasional"
+          action={<QuickAddButton kind="expense" preset={{ periodId: period.id, periodLabel: label }} className="btn-primary btn-sm shrink-0 whitespace-nowrap">
+            <IconPlus width={16} /> Tambah
+          </QuickAddButton>}>
+          {period.expenses.length === 0 ? <Empty>Belum ada pengeluaran. Tambah di sini, atau centang transfer yang sudah dikirim.</Empty> : (
+            <ExpenseList expenses={period.expenses} periodLabel={label} editable />
+          )}
+          <div className="mt-2 flex min-h-12 items-center justify-between border-t-[1.5px] border-ink text-sm font-semibold">
+            <span>Total pengeluaran</span>
+            <span className="num">{rupiah(s.expenseTotal)}</span>
+          </div>
+        </Section>
+      )}
+
+      {tab === "transfers" && (
+        <Section title={`Transfer · ${unsent ? `${unsent} belum dikirim` : "semua terkirim"}`}>
+          {transfers.length === 0 ? (
+            <Empty>Belum ada penerima. Tambahkan di <Link href="/pengaturan" className="underline">Pengaturan</Link>.</Empty>
+          ) : (
+            <ul className="divide-y divide-line">
+              {transfers.map((t) => {
+                const amount = t.amount ?? t.recipient.monthlyAmount;
+                return (
+                  <li key={t.id} className={`py-3 ${isDue(t.due) ? "" : "opacity-60"}`}>
+                    <div className="flex items-center gap-2">
+                      <TransferToggle variant="switch" id={t.id} sent={t.isSent} amount={amount} name={t.recipient.name} />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold">
-                          Transfer to {t.recipient.name}
+                        <div className="truncate text-sm font-medium">
+                          {t.recipient.name}
                           {t.recipient.role && <span className="ml-1.5 text-xs font-normal text-ink-soft">· {t.recipient.role}</span>}
                         </div>
                         <div className="text-xs text-ink-soft">
-                          {(t.amount ?? t.recipient.monthlyAmount) ? `${rupiah((t.amount ?? t.recipient.monthlyAmount)!)} · ` : ""}
-                          {t.due.kind === "later" ? `Turn in ${dueLabel(t.due)}` : dueLabel(t.due)}
-                          {" · "}
+                          {amount ? `${rupiah(amount)} · ` : ""}{dueLabel(t.due)}{" · "}
                           {t.isSent && t.sentAt
-                            ? `Sent ${t.sentAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}`
-                            : isDue(t.due) ? "Not sent yet" : "Not due"}
+                            ? `Terkirim ${t.sentAt.toLocaleDateString("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}`
+                            : isDue(t.due) ? "Belum dikirim" : "Belum giliran"}
                         </div>
                       </div>
                     </div>
                     {(t.recipient.accountNumber || t.recipient.bankName) && (
-                      <div className="pb-1 pl-[52px]">
+                      <div className="pl-[52px]">
                         <BankAccount bank={t.recipient.bankName} account={t.recipient.accountNumber} holder={t.recipient.accountHolder} />
                       </div>
                     )}
                   </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-        </div>
-      </div>
+                );
+              })}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-ink-soft">Menyalakan transfer mencatat nominalnya sebagai pengeluaran bulan ini.</p>
+        </Section>
+      )}
     </>
   );
 }

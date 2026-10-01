@@ -38,8 +38,8 @@ function refresh() {
 
 export async function login(_prev: string | null, form: FormData) {
   const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) return "ADMIN_PASSWORD is not set in .env";
-  if (!timingSafeEqual(str(form, "password"), expected)) return "Wrong password";
+  if (!expected) return "ADMIN_PASSWORD belum diisi di .env";
+  if (!timingSafeEqual(str(form, "password"), expected)) return "Kata sandi salah";
   (await cookies()).set(SESSION_COOKIE, await createToken(), {
     httpOnly: true,
     sameSite: "lax",
@@ -90,9 +90,9 @@ export async function addTenant(form: FormData) {
   await requireAdmin();
   const roomId = str(form, "roomId");
   const name = str(form, "tenantName");
-  if (!name) return "Enter the tenant's name.";
+  if (!name) return "Isi nama penghuni.";
   const room = await db.room.findUnique({ where: { id: roomId }, include: { tenant: true } });
-  if (!room) return "That room no longer exists.";
+  if (!room) return "Kamar itu sudah tidak ada.";
   if (room.tenant) return `Room ${room.number} already has a tenant (${room.tenant.name}).`;
 
   await db.tenant.create({
@@ -232,7 +232,7 @@ export async function updateExpense(form: FormData) {
   const cat = expenseCategory(form);
   if ("error" in cat) return cat.error;
   const amount = parseAmount(form.get("amount"));
-  if (amount <= 0) return "Enter an amount above 0.";
+  if (amount <= 0) return "Isi jumlah lebih dari 0.";
   const row = await db.expense.update({
     where: { id: str(form, "id") },
     data: { ...cat, description: str(form, "description") || "-", amount },
@@ -303,9 +303,9 @@ function reminderData(form: FormData) {
 }
 
 function reminderError(data: ReturnType<typeof reminderData>) {
-  if (!data.title) return "Enter what to remember.";
-  if (data.dueDate && Number.isNaN(data.dueDate.getTime())) return "Pick a valid date.";
-  if (data.repeat !== "NONE" && !data.dueDate) return "A repeating reminder needs a date to start from.";
+  if (!data.title) return "Isi apa yang perlu diingat.";
+  if (data.dueDate && Number.isNaN(data.dueDate.getTime())) return "Pilih tanggal yang benar.";
+  if (data.repeat !== "NONE" && !data.dueDate) return "Pengingat berulang butuh tanggal mulai.";
 }
 
 // These return an error message for the sheet to show, or undefined on success.
@@ -339,12 +339,12 @@ export async function completeReminder(_prev: string | null | undefined, form: F
     const year = today.getUTCFullYear();
     const month = today.getUTCMonth() + 1;
     const period = await db.cashPeriod.findUnique({ where: { year_month: { year, month } } });
-    if (!period) return `Start the ${periodLabel(year, month)} cash book first.`;
+    if (!period) return `Mulai buku kas ${periodLabel(year, month)} dulu.`;
     const category = r.category ?? "LAINNYA";
     await db.expense.create({
       data: {
         periodId: period.id, category, categoryLabel: category === "LAINNYA" ? r.title : null, amount: paid,
-        description: r.dueDate ? `${r.title} · due ${formatDate(r.dueDate)}` : r.title,
+        description: r.dueDate ? `${r.title} · jatuh tempo ${formatDate(r.dueDate)}` : r.title,
       },
     });
     await recarryBalances(year, month);
@@ -430,10 +430,10 @@ export async function sendTestPush() {
   await requireAdmin();
   const due = await dueReminders();
   return sendPushToAll({
-    title: "Reminder alerts are on",
+    title: "Peringatan pengingat menyala",
     body: due.length
-      ? `${due.length} reminder${due.length > 1 ? "s" : ""} due right now. Tap to open them.`
-      : "You'll get an alert here at 09:00 when rent or a reminder is due soon, due today, or overdue.",
+      ? `${due.length} pengingat jatuh tempo sekarang. Ketuk untuk membukanya.`
+      : "Kamu akan menerima peringatan di sini jam 09.00 saat sewa atau pengingat segera jatuh tempo, jatuh tempo hari ini, atau telat.",
     url: "/pengingat",
   });
 }

@@ -42,7 +42,7 @@ export function ExpenseList({ expenses, periodLabel, editable }: { expenses: Exp
   }
   const groups = [...byName.values()].sort((a, b) => b.total - a.total);
 
-  const row = "-mx-2 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-2xl px-2 py-1.5 text-left transition-colors hover:bg-cream/70";
+  const row = "-mx-2 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-[4px] px-2 py-1.5 text-left transition-colors hover:bg-cream";
 
   return (
     <>
@@ -53,9 +53,9 @@ export function ExpenseList({ expenses, periodLabel, editable }: { expenses: Exp
             <>
               <IconBadge icon={g.meta.icon} tone={g.meta.tone} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{single ? titleOf(single) : g.name}</span>
+                <span className="block truncate text-sm font-medium">{single ? titleOf(single) : g.name}</span>
                 <span className="block truncate text-xs text-ink-soft">
-                  {single ? (titleOf(single) !== g.name ? g.name : formatDate(single.createdAt)) : `${g.items.length} payments`}
+                  {single ? (titleOf(single) !== g.name ? g.name : formatDate(single.createdAt)) : `${g.items.length} pembayaran`}
                 </span>
               </span>
               <span className="num shrink-0 text-sm font-semibold">{rupiah(g.total)}</span>
@@ -105,36 +105,36 @@ function ExpenseSheet({ expense, periodLabel, editable, onClose }: {
   const e = expense;
 
   return (
-    <Sheet open={Boolean(e)} onClose={onClose} title={editing ? "Edit expense" : "Expense"}>
+    <Sheet open={Boolean(e)} onClose={onClose} title={editing ? "Edit pengeluaran" : "Pengeluaran"}>
       {e && !editing && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col items-center gap-2 text-center">
             <IconBadge icon={EXPENSE_META[e.category].icon} tone={EXPENSE_META[e.category].tone} size={56} />
-            <div className="num text-3xl font-semibold tracking-tight">{rupiah(e.amount)}</div>
-            <p className="text-sm font-semibold break-words whitespace-pre-line">{titleOf(e)}</p>
+            <div className="num text-3xl font-medium tracking-tight">{rupiah(e.amount)}</div>
+            <p className="text-sm font-medium break-words whitespace-pre-line">{titleOf(e)}</p>
           </div>
-          <dl className="divide-y divide-line rounded-2xl bg-white px-4 text-sm">
+          <dl className="divide-y divide-line border-y-[1.5px] border-ink text-sm">
             {[
-              ["Category", expenseCategoryName(e)],
-              ["Cash book", periodLabel],
-              ["Recorded", e.transferCheckId ? `${formatDate(e.createdAt)} · from transfer checklist` : formatDate(e.createdAt)],
+              ["Kategori", expenseCategoryName(e)],
+              ["Buku kas", periodLabel],
+              ["Dicatat", e.transferCheckId ? `${formatDate(e.createdAt)} · dari daftar transfer` : formatDate(e.createdAt)],
             ].map(([k, v]) => (
               <div key={k} className="flex min-h-11 items-center justify-between gap-3 py-2">
                 <dt className="text-ink-soft">{k}</dt>
-                <dd className="text-right font-semibold">{v}</dd>
+                <dd className="text-right font-medium">{v}</dd>
               </div>
             ))}
           </dl>
           {editable && (
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => { setError(null); setEditing(true); }} className="btn-primary flex-1">
-                <IconEdit width={24} /> Edit
+                <IconEdit width={18} /> Edit
               </button>
               <form action={deleteExpense}>
                 <input type="hidden" name="id" value={e.id} />
-                <ConfirmButton message={`Delete expense "${titleOf(e)}"?`} aria-label={`Delete expense ${titleOf(e)}`}
+                <ConfirmButton message={`Hapus pengeluaran "${titleOf(e)}"?`} aria-label={`Hapus pengeluaran ${titleOf(e)}`}
                   className="btn-secondary cursor-pointer">
-                  <IconTrash width={18} height={18} /> Delete
+                  <IconTrash width={18} /> Hapus
                 </ConfirmButton>
               </form>
             </div>
@@ -152,22 +152,22 @@ function ExpenseSheet({ expense, periodLabel, editable, onClose }: {
               else setEditing(false);
             } catch (err) {
               reportClientIssue("form-save-failed", { form: "Edit expense", ...errorDetails(err) });
-              setError("Couldn't save. Check your connection and try again.");
+              setError("Gagal menyimpan. Periksa koneksi, lalu coba lagi.");
             }
           }}>
           <input type="hidden" name="id" value={e.id} />
           <ExpenseCategoryField idPrefix="exp-edit" defaultCategory={e.category} defaultLabel={e.categoryLabel} />
-          <Field label="Description" htmlFor="exp-edit-desc">
+          <Field label="Keterangan" htmlFor="exp-edit-desc">
             <input id="exp-edit-desc" name="description" defaultValue={e.description === "-" ? "" : e.description} className="field" />
           </Field>
-          <Field label="Amount (Rp)" htmlFor="exp-edit-amount">
+          <Field label="Jumlah (Rp)" htmlFor="exp-edit-amount">
             <AmountInput id="exp-edit-amount" name="amount" defaultValue={e.amount} required
-              pattern="[0-9.,\s]*[1-9][0-9.,\s]*" title="Enter an amount above 0" className="field num" />
+              pattern="[0-9.,\s]*[1-9][0-9.,\s]*" title="Isi jumlah lebih dari 0" className="field num" />
           </Field>
-          {error && <p role="alert" className="rounded-xl bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
+          {error && <p role="alert" className="rounded-[4px] border-[1.5px] border-blush-deep bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Cancel</button>
-            <SubmitButton className="btn-primary flex-1" pendingText="Saving…">Save</SubmitButton>
+            <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Batal</button>
+            <SubmitButton className="btn-primary flex-1" pendingText="Menyimpan…">Simpan</SubmitButton>
           </div>
         </form>
       )}

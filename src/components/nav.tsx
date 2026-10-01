@@ -12,9 +12,9 @@ import { NotificationBell, type Notification } from "./notification-bell";
 
 const PAGES = [
   { href: "/", label: "Ringkasan" },
+  { href: "/pengingat", label: "Pengingat" },
   { href: "/kamar", label: "Kamar" },
   { href: "/kas", label: "Buku kas" },
-  { href: "/pengingat", label: "Pengingat" },
 ];
 const SETTINGS = { href: "/pengaturan", label: "Pengaturan" };
 
@@ -128,7 +128,7 @@ function MenuSheet({ open, onClose, cashHref, dueCount }: NavProps & { open: boo
   );
 }
 
-// Page-end tabs, the same four pages as the menu. They sit after the content, not fixed.
+// Page-end tabs, the same four pages as the menu (Pengingat second: it's checked most after Ringkasan). They sit after the content, not fixed.
 export function PageTabs({ cashHref }: { cashHref: string }) {
   const { isOn, onTap } = useNavHighlight();
   return (

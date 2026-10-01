@@ -8,7 +8,7 @@ import { SelectPill, type SelectOption } from "./kit-client";
 export function MonthSelect({ options, value, hrefTemplate }: { options: SelectOption[]; value: string; hrefTemplate: string }) {
   const router = useRouter();
   return (
-    <SelectPill key={value} ariaLabel="Month" icon={IconCalendar} options={options} defaultValue={value}
+    <SelectPill key={value} ariaLabel="Bulan" icon={IconCalendar} options={options} defaultValue={value}
       className="min-w-48 flex-1"
       onChange={(v) => router.push(hrefTemplate.replace(":month", v), { scroll: false })} />
   );

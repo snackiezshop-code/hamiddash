@@ -51,10 +51,10 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       await subscribePush(JSON.parse(JSON.stringify(sub)));
       setState("on");
       await sendTestPush();
-      setNote("Sent a test alert to this device.");
+      setNote("Peringatan uji coba sudah dikirim ke perangkat ini.");
     } catch {
       setState(Notification.permission === "denied" ? "denied" : "off");
-      setNote("Couldn't turn alerts on. Try again.");
+      setNote("Gagal menyalakan peringatan. Coba lagi.");
     } finally {
       setBusy(false);
     }
@@ -76,42 +76,42 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   }
 
   const message: Record<State, string> = {
-    loading: "Checking this device…",
-    unsupported: "This browser can't receive push alerts. Open Hamid on your phone to turn them on.",
-    embedded: "This built-in browser can't show notifications. Open Hamid on your phone to turn alerts on.",
-    "needs-install": "On iPhone: tap Share → Add to Home Screen, open Hamid from the home screen, then come back here.",
+    loading: "Memeriksa perangkat ini…",
+    unsupported: "Browser ini tidak bisa menerima peringatan. Buka HamidKost di HP untuk menyalakannya.",
+    embedded: "Browser bawaan ini tidak bisa menampilkan notifikasi. Buka HamidKost di HP untuk menyalakan peringatan.",
+    "needs-install": "Di iPhone: ketuk Bagikan → Tambah ke Layar Utama, buka HamidKost dari layar utama, lalu kembali ke sini.",
     denied: state === "denied" && isIosDevice()
-      ? "Notifications are turned off for Hamid. On your iPhone go to Settings → Notifications → Hamid, turn on Allow Notifications, then tap Check again."
-      : "Notifications are blocked for this site. Tap the icon left of the address bar → Notifications → Allow, then tap Check again.",
-    off: "Get an alert at 09:00 when rent is due in 3 days, due today, or still unpaid after the due date.",
-    on: "Alerts are on for this device. You'll get one at 09:00 on days a reminder is due.",
+      ? "Notifikasi HamidKost dimatikan. Di iPhone buka Pengaturan → Notifikasi → HamidKost, nyalakan Izinkan Notifikasi, lalu ketuk Cek lagi."
+      : "Notifikasi diblokir untuk situs ini. Ketuk ikon di kiri bilah alamat → Notifikasi → Izinkan, lalu ketuk Cek lagi.",
+    off: "Dapatkan peringatan jam 09.00 saat sewa jatuh tempo 3 hari lagi, hari ini, atau masih belum dibayar setelah jatuh tempo.",
+    on: "Peringatan menyala di perangkat ini. Kamu akan menerimanya jam 09.00 pada hari ada pengingat yang jatuh tempo.",
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${state === "on" ? "bg-mint text-mint-deep" : "bg-cream text-ink"}`}>
+    <div className="flex flex-wrap items-start gap-3">
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink ${state === "on" ? "bg-navy text-white" : "bg-card text-ink"}`}>
         <IconBell width={20} height={20} />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)]">
         <p className="text-sm">{message[state]}</p>
         {!publicKey && state === "off" && (
-          <p className="mt-1 text-xs text-blush-deep">Push isn&apos;t configured on the server yet (VAPID keys missing).</p>
+          <p className="mt-1 text-xs text-blush-deep">Peringatan push belum disiapkan di server (kunci VAPID belum ada).</p>
         )}
         {note && <p className="mt-1 text-xs text-ink-soft" aria-live="polite">{note}</p>}
       </div>
       {state === "off" && (
-        <button type="button" onClick={enable} disabled={busy || !publicKey} className="btn-primary btn-sm disabled:opacity-50">
-          {busy ? "Turning on…" : "Turn on alerts"}
+        <button type="button" onClick={enable} disabled={busy || !publicKey} className="btn-primary btn-sm ml-[52px] disabled:opacity-50">
+          {busy ? "Menyalakan…" : "Nyalakan peringatan"}
         </button>
       )}
       {state === "denied" && (
-        <button type="button" onClick={check} className="btn-secondary btn-sm">
-          Check again
+        <button type="button" onClick={check} className="btn-secondary btn-sm ml-[52px]">
+          Cek lagi
         </button>
       )}
       {state === "on" && (
-        <button type="button" onClick={disable} disabled={busy} className="btn-secondary btn-sm disabled:opacity-50">
-          {busy ? "Turning off…" : "Turn off"}
+        <button type="button" onClick={disable} disabled={busy} className="btn-secondary btn-sm ml-[52px] disabled:opacity-50">
+          {busy ? "Mematikan…" : "Matikan"}
         </button>
       )}
     </div>

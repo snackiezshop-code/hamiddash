@@ -9,7 +9,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/kas/[period]/report
   const { period: slug } = await ctx.params;
   const ym = parsePeriodSlug(slug);
   const period = ym && (await getPeriod(ym.year, ym.month));
-  if (!period) return new Response("Period not found", { status: 404 });
+  if (!period) return new Response("Buku kas tidak ditemukan", { status: 404 });
 
   const pdf = await renderToBuffer(MonthlyReport({ period, summary: summarize(period) }));
   const filename = `Laporan Bulanan Kost Mujair 12 - ${bulanLabel(period.year, period.month).toUpperCase()}.pdf`;

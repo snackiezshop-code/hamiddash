@@ -37,7 +37,7 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  // Phones get the room drawer (same as the Rooms list); desktop goes to the room page.
+  // Opens the room sheet, like tapping the room in the list.
   const go = (n: number) => {
     setOpen(false);
     setQuery("");
@@ -45,14 +45,14 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
   };
 
   return (
-    <div ref={ref} className="relative w-full max-w-md">
-      <label className="flex items-center gap-2 h-11 rounded-xl border border-line bg-white px-4 focus-within:border-ink focus-within:ring-1 focus-within:ring-ink">
+    <div ref={ref} className="relative w-full">
+      <label className="flex h-12 items-center gap-2 rounded-[4px] border-[1.5px] border-ink bg-card px-3.5 transition-shadow focus-within:shadow-[3px_3px_0_var(--color-ink)]">
         <IconSearch width={18} height={18} className="shrink-0 text-ink-soft" />
         <input
           type="search"
           value={query}
-          placeholder="Room or tenant"
-          aria-label="Search rooms and tenants"
+          placeholder="Nomor kamar, nama, atau no. HP"
+          aria-label="Cari kamar atau penghuni"
           role="combobox"
           aria-expanded={open && query.trim() !== ""}
           aria-controls="room-search-results"
@@ -82,15 +82,15 @@ export function RoomSearch({ rooms }: { rooms: SearchRoom[] }) {
 
       {open && query.trim() !== "" && (
         <ul id="room-search-results" role="listbox"
-          className="absolute z-40 mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-line bg-white py-1.5 shadow-lg">
+          className="absolute z-40 mt-2 max-h-80 w-full overflow-y-auto rounded-[4px] border-[1.5px] border-ink bg-card py-1 shadow-[4px_4px_0_var(--color-ink)]">
           {results.length === 0 ? (
-            <li className="px-5 py-3 text-sm text-ink-soft">No matches</li>
+            <li className="px-4 py-3 text-sm text-ink-soft">Tidak ditemukan</li>
           ) : results.map((r, i) => (
             <li key={r.number} role="option" aria-selected={i === active}>
               <Link href={`/kamar/${r.number}`} onClick={(e) => { e.preventDefault(); go(r.number); }} onMouseEnter={() => setActive(i)}
-                className={`flex items-center justify-between gap-3 px-5 py-2.5 ${i === active ? "bg-cream" : ""}`}>
+                className={`flex min-h-12 items-center justify-between gap-3 px-4 py-2 ${i === active ? "bg-cream" : ""}`}>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold">Room {r.number} · {r.tenant ?? "No tenant"}</span>
+                  <span className="block text-sm font-medium">Kamar {r.number} · {r.tenant ?? "Tanpa penghuni"}</span>
                   {r.phone && <span className="num block text-xs text-ink-soft">{r.phone}</span>}
                 </span>
                 <span className={`pill ${TONE_CLASS[STATUS_TONE[r.status]]}`}>{STATUS_LABEL[r.status]}</span>

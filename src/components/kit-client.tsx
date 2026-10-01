@@ -344,7 +344,7 @@ export function SegmentedLinks({ label, items }: { label: string; items: { href:
             <li key={it.href} className="flex-1">
               <Link href={it.href} scroll={false} aria-current={active ? "page" : undefined}
                 onClick={(e) => { if (!e.metaKey && !e.ctrlKey) setTap({ href: it.href, from: here }); }}
-                className={`flex min-h-10 items-center justify-center rounded-[2px] px-3 text-[0.72rem] font-semibold uppercase tracking-[0.1em] whitespace-nowrap transition-colors ${
+                className={`flex min-h-10 items-center justify-center rounded-[2px] px-2 text-[0.68rem] font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-colors ${
                   active ? "bg-navy text-white" : "text-ink-soft hover:text-ink"
                 }`}>
                 {it.label}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { STATUS_LABEL, STATUS_OPTIONS, dateInputValue, periodLabel, periodSlug, rupiah } from "@/lib/format";
+import { STATUS_LABEL, STATUS_OPTIONS, dateInputValue, periodLabel, periodSlug, properName, rupiah } from "@/lib/format";
 import { updateRoom } from "@/app/actions";
 import { PageHeader, Section, StatusPill, WaButton } from "@/components/ui";
 import { AmountInput, SubmitButton } from "@/components/forms";
@@ -28,17 +28,17 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
 
   return (
     <>
-      <Link href="/kamar" className="mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-ink-soft hover:text-ink">
-        <IconChevronLeft width={16} height={16} /> All rooms
+      <Link href="/kamar" className="eyebrow mb-2 inline-flex min-h-11 items-center gap-1 text-ink-soft hover:text-ink">
+        <IconChevronLeft width={14} height={14} /> Semua kamar
       </Link>
-      <PageHeader title={`Room ${room.number}`} subtitle={<StatusPill status={room.status} />}
-        actions={<WaButton phone={t?.phone} label={`Chat ${t?.name ?? ""}`.trim()} />} />
+      <PageHeader eyebrow={t ? properName(t.name) : "Tanpa penghuni"} title={`Kamar ${room.number}`} subtitle={<StatusPill status={room.status} />}
+        actions={<WaButton phone={t?.phone} label={t ? `Chat ${properName(t.name)}` : "Chat"} />} />
 
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <form action={updateRoom} className="card flex flex-col gap-5 bg-white">
+      <div className="flex flex-col gap-4">
+        <form action={updateRoom} className="card flex flex-col gap-6">
           <input type="hidden" name="roomId" value={room.id} />
           <div>
-            <h2 className="h-display mb-3 text-lg">Room</h2>
+            <h2 className="eyebrow mb-3 border-b-[1.5px] border-ink pb-2">Kamar</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <span className="label">Status</span>
@@ -46,58 +46,58 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
                   options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABEL[s] }))} />
               </div>
               <div>
-                <label className="label" htmlFor="monthlyRent">Monthly rent (Rp)</label>
+                <label className="label" htmlFor="monthlyRent">Sewa per bulan (Rp)</label>
                 <AmountInput id="monthlyRent" name="monthlyRent" defaultValue={room.monthlyRent} className="field num" required />
               </div>
             </div>
-            <p className="mt-2 text-xs text-ink-soft">Changing the status also updates this room&apos;s row in the latest month&apos;s cash book.</p>
+            <p className="mt-2 text-xs text-ink-soft">Mengubah status juga mengubah baris kamar ini di buku kas bulan terakhir.</p>
           </div>
 
           <div>
-            <h2 className="h-display mb-3 text-lg">Tenant</h2>
+            <h2 className="eyebrow mb-3 border-b-[1.5px] border-ink pb-2">Penghuni</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="label" htmlFor="tenantName">Name</label>
-                <input id="tenantName" name="tenantName" defaultValue={t?.name ?? ""} className="field" placeholder="Leave empty if the room has no tenant" />
+                <label className="label" htmlFor="tenantName">Nama</label>
+                <input id="tenantName" name="tenantName" defaultValue={t?.name ?? ""} className="field" placeholder="Kosongkan kalau kamar tanpa penghuni" />
               </div>
               <div>
-                <label className="label" htmlFor="phone">WhatsApp number</label>
+                <label className="label" htmlFor="phone">Nomor WhatsApp</label>
                 <input id="phone" name="phone" type="tel" defaultValue={t?.phone ?? ""} className="field num" placeholder="08xx…" />
               </div>
               <div>
-                <label className="label" htmlFor="reminderDay">Reminder day of month</label>
+                <label className="label" htmlFor="reminderDay">Tanggal tagih tiap bulan</label>
                 <input id="reminderDay" name="reminderDay" type="number" min={1} max={31} inputMode="numeric"
-                  defaultValue={t?.reminderDay ?? ""} className="field num" placeholder="e.g. 15" />
+                  defaultValue={t?.reminderDay ?? ""} className="field num" placeholder="15" />
               </div>
               <div>
-                <label className="label" htmlFor="moveInDate">Move-in date</label>
+                <label className="label" htmlFor="moveInDate">Tanggal masuk</label>
                 <input id="moveInDate" name="moveInDate" type="date" defaultValue={dateInputValue(t?.moveInDate)} className="field num" />
               </div>
               <div>
-                <label className="label" htmlFor="leaseEndDate">Lease end date</label>
+                <label className="label" htmlFor="leaseEndDate">Kontrak sampai</label>
                 <input id="leaseEndDate" name="leaseEndDate" type="date" defaultValue={dateInputValue(t?.leaseEndDate)} className="field num" />
               </div>
               <div className="sm:col-span-2">
-                <label className="label" htmlFor="notes">Notes</label>
-                <textarea id="notes" name="notes" rows={3} defaultValue={t?.notes ?? ""} className="field rounded-2xl" />
+                <label className="label" htmlFor="notes">Catatan</label>
+                <textarea id="notes" name="notes" rows={3} defaultValue={t?.notes ?? ""} className="field" />
               </div>
             </div>
           </div>
 
           <div className="flex gap-2">
-            <SubmitButton pendingText="Saving…">Save</SubmitButton>
-            <Link href="/kamar" className="btn-secondary">Cancel</Link>
+            <SubmitButton className="btn-primary flex-1" pendingText="Menyimpan…">Simpan</SubmitButton>
+            <Link href="/kamar" className="btn-secondary">Batal</Link>
           </div>
         </form>
 
-        <Section title="Payment history">
+        <Section title="Riwayat bayar · 12 bulan">
           {room.roomIncomes.length === 0 ? (
-            <p className="text-sm text-ink-soft">No records yet.</p>
+            <p className="text-sm text-ink-soft">Belum ada catatan.</p>
           ) : (
             <ul className="divide-y divide-line">
               {room.roomIncomes.map((inc) => (
-                <li key={inc.id} className="flex items-center justify-between gap-2 py-2.5">
-                  <Link href={`/kas/${periodSlug(inc.period.year, inc.period.month)}`} className="text-sm font-semibold hover:underline">
+                <li key={inc.id} className="flex min-h-12 items-center justify-between gap-2">
+                  <Link href={`/kas/${periodSlug(inc.period.year, inc.period.month)}`} className="text-sm underline-offset-4 hover:underline">
                     {periodLabel(inc.period.year, inc.period.month)}
                   </Link>
                   <div className="flex items-center gap-2">

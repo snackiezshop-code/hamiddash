@@ -5,7 +5,7 @@ import { createContext, useContext, useState, type ComponentProps, type ReactNod
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { checkoutTenant } from "@/app/actions";
 import { STATUS_LABEL, formatDate, periodLabel, reminderText, rupiah } from "@/lib/format";
-import { Avatar, Chevron, IconBadge, ListRow, STATUS_PASTEL } from "./kit";
+import { Avatar, Chevron, IconBadge, STATUS_PASTEL } from "./kit";
 import { Sheet } from "./kit-client";
 import { ConfirmButton } from "./forms";
 import { IconBed, IconEdit } from "./icons";
@@ -65,30 +65,34 @@ export function RoomLink({ roomNumber, onClick, ...rest }: Omit<ComponentProps<t
   );
 }
 
-export function RoomsMobileList({ rooms }: { rooms: DrawerRoom[] }) {
-  return (
-    <RoomDrawerProvider rooms={rooms}>
-      <RoomsMobileRows rooms={rooms} />
-    </RoomDrawerProvider>
-  );
-}
-
-function RoomsMobileRows({ rooms }: { rooms: DrawerRoom[] }) {
+// Every room as one row: a status-coloured number square, the tenant, rent and status. Tapping a
+// row opens the room sheet. Must sit inside a RoomDrawerProvider.
+export function RoomRows({ rooms }: { rooms: DrawerRoom[] }) {
   const openRoom = useRoomDrawer();
   return (
-    <ul className="divide-y divide-line px-4 md:hidden">
-      {rooms.map((r) => (
-        <li key={r.id}>
-          <button type="button" onClick={() => openRoom(r.number)} className="block w-full cursor-pointer text-left"
-            aria-label={`Kamar ${r.number}${r.tenant ? `, ${r.tenant.name}` : ", tanpa penghuni"}, ${STATUS_LABEL[r.status]}. Buka detail`}>
-            <ListRow
-              leading={r.tenant ? <Avatar name={r.tenant.name} tone={STATUS_PASTEL[r.status]} /> : <IconBadge icon={IconBed} tone={STATUS_PASTEL[r.status]} />}
-              title={`Kamar ${r.number} · ${r.tenant?.name ?? "Tanpa penghuni"}`}
-              subtitle={<><span className="num">{rupiah(r.monthlyRent)}</span> · {STATUS_LABEL[r.status]}</>}
-              trailing={<Chevron />} />
-          </button>
-        </li>
-      ))}
+    <ul className="card divide-y divide-line p-0">
+      {rooms.map((r) => {
+        const paid = r.status === "LUNAS" || r.status === "TAHUNAN";
+        return (
+          <li key={r.id}>
+            <button type="button" onClick={() => openRoom(r.number)} className="flex min-h-16 w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left hover:bg-cream"
+              aria-label={`Kamar ${r.number}${r.tenant ? `, ${r.tenant.name}` : ", tanpa penghuni"}, ${STATUS_LABEL[r.status]}. Buka kamar`}>
+              <span aria-hidden
+                className={`num grid h-11 w-11 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink text-base font-medium ${
+                  paid ? "bg-navy text-white" : r.status === "TUNDA_BAYAR" ? "bg-orange text-white" : "bg-card"}`}
+                style={r.status === "RUSAK" ? { background: "repeating-linear-gradient(135deg, var(--color-card) 0 4px, var(--color-ink) 4px 5.5px)" } : undefined}>
+                <span className={r.status === "RUSAK" ? "bg-card px-0.5" : ""}>{r.number}</span>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate font-medium ${r.tenant ? "" : "text-ink-soft"}`}>{r.tenant?.name ?? "Tanpa penghuni"}</span>
+                <span className="num block truncate text-xs text-ink-soft">{r.monthlyRent > 0 ? rupiah(r.monthlyRent) : "Tahunan"}{r.tenant?.reminderDay ? ` · tgl ${r.tenant.reminderDay}` : ""}</span>
+              </span>
+              <StatusPill status={r.status} />
+              <Chevron />
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -1,6 +1,6 @@
 import { dueItems, dueReminders } from "@/lib/reminders";
 import { dueLabel } from "@/lib/reminder-items";
-import { rupiah } from "@/lib/format";
+import { properName, rupiah } from "@/lib/format";
 import { sendPushToAll } from "@/lib/push";
 import { ensureCurrentPeriod } from "@/lib/cashbook";
 
@@ -21,24 +21,24 @@ export async function GET(request: Request) {
   const own = items.filter((i) => i.alertToday);
   if (due.length === 0 && own.length === 0) return Response.json({ due: 0, own: 0 });
 
-  const rooms = (list: typeof due) => list.map((d) => `Room ${d.roomNumber} (${d.tenantName})`).join(", ");
+  const rooms = (list: typeof due) => list.map((d) => `Kamar ${d.roomNumber} (${properName(d.tenantName)})`).join(", ");
   const late = due.filter((d) => d.daysUntilDue < 0);
   const today = due.filter((d) => d.daysUntilDue === 0);
   const soon = due.filter((d) => d.daysUntilDue > 0);
   const body = [
-    late.length ? `Overdue: ${rooms(late)}` : null,
-    today.length ? `Due today: ${rooms(today)}` : null,
-    soon.length ? `Due in 3 days: ${rooms(soon)}` : null,
+    late.length ? `Telat: ${rooms(late)}` : null,
+    today.length ? `Jatuh tempo hari ini: ${rooms(today)}` : null,
+    soon.length ? `Jatuh tempo 3 hari lagi: ${rooms(soon)}` : null,
     ...own.map((i) => `${i.title}${i.amount ? ` ${rupiah(i.amount)}` : ""}: ${dueLabel(i.daysUntilDue).toLowerCase()}`),
   ].filter(Boolean).join("\n");
 
   const title = [
-    due.length ? `${due.length} rent reminder${due.length > 1 ? "s" : ""} to send` : null,
-    own.length ? (own.length === 1 ? own[0].title : `${own.length} reminders due`) : null,
+    due.length ? `${due.length} pengingat sewa perlu dikirim` : null,
+    own.length ? (own.length === 1 ? own[0].title : `${own.length} pengingat jatuh tempo`) : null,
   ].filter(Boolean).join(" · ");
   const result = await sendPushToAll({
     title,
-    body: `${body}\nTap to open ${due.length ? "the WhatsApp messages" : "reminders"}.`,
+    body: `${body}\nKetuk untuk membuka ${due.length ? "pesan WhatsApp" : "pengingat"}.`,
     url: "/pengingat",
   });
   return Response.json({ due: due.length, own: own.length, ...result });

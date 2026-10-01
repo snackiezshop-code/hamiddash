@@ -12,15 +12,16 @@ export default function CashBookError({ error, retry }: { error: Error & { diges
   }, [error]);
 
   return (
-    <div className="card mx-auto mt-6 max-w-md bg-white text-center">
-      <h1 className="font-greeting text-3xl">Something went wrong</h1>
+    <div className="card mt-6">
+      <p className="eyebrow text-orange-text">Terjadi kesalahan</p>
+      <h1 className="h-display mt-2 text-2xl">Buku kas gagal dimuat</h1>
       <p className="mt-2 text-sm text-ink-soft">
-        The cash book couldn&apos;t load. Your last change may or may not have saved, so check it after retrying.
+        Perubahan terakhirmu mungkin belum tersimpan. Coba lagi, lalu periksa angkanya.
       </p>
-      {error.digest && <p className="num mt-2 text-xs text-ink-soft">Ref {error.digest}</p>}
+      {error.digest && <p className="num mt-2 text-xs text-ink-soft">Kode {error.digest}</p>}
       <div className="mt-5 flex flex-col gap-2">
-        <button type="button" onClick={() => retry()} className="btn-primary w-full">Try again</button>
-        <Link href="/kas" className="btn-secondary w-full">Back to this month</Link>
+        <button type="button" onClick={() => retry()} className="btn-primary w-full">Coba lagi</button>
+        <Link href="/kas" className="btn-secondary w-full">Kembali ke bulan ini</Link>
       </div>
     </div>
   );

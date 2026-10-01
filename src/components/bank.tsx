@@ -11,10 +11,10 @@ const BANK_MARKS: Record<string, { bg: string; fg: string; accent?: string }> = 
 
 export function BankBadge({ bank }: { bank: string }) {
   const mark = BANK_MARKS[bank.toUpperCase()];
-  if (!mark) return <span className="pill bg-white text-ink-soft">{bank}</span>;
+  if (!mark) return <span className="pill text-ink-soft">{bank}</span>;
   return (
     <span
-      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] font-extrabold tracking-wide"
+      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[3px] border-[1.5px] border-ink px-1.5 text-[11px] font-bold tracking-wide"
       style={{ background: mark.bg, color: mark.fg }}
       aria-label={`Bank ${bank}`}
     >
@@ -50,10 +50,10 @@ export function BankAccount({ bank, account, holder }: { bank: string | null; ac
         <span className="num text-sm">{account}</span>
         {holder && <span className="text-xs opacity-70">{holder}</span>}
       </span>
-      <button type="button" onClick={copy} aria-label={copied ? "Copied" : `Copy account number ${account}`}
-        title={copied ? "Copied" : "Copy account number"}
-        className={`-my-1.5 grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-colors ${
-          copied ? "bg-mint text-mint-deep" : "text-ink-soft hover:bg-white hover:text-ink"
+      <button type="button" onClick={copy} aria-label={copied ? "Tersalin" : `Salin nomor rekening ${account}`}
+        title={copied ? "Tersalin" : "Salin nomor rekening"}
+        className={`-my-1.5 grid h-11 w-11 cursor-pointer place-items-center rounded-[4px] transition-colors ${
+          copied ? "bg-mint text-mint-deep" : "text-ink-soft hover:bg-cream hover:text-ink"
         }`}>
         {copied ? <IconCheck width={16} height={16} strokeWidth={3} /> : <IconCopy width={16} height={16} />}
       </button>

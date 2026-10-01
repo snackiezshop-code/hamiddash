@@ -77,11 +77,12 @@ export function Chevron() {
 
 type CategoryMeta = { tone: Pastel; icon: AppIcon };
 
-export const TASK_CATEGORIES: ({ value: string } & CategoryMeta)[] = [
-  { value: "Cleaning", tone: "mint", icon: IconSpray },
-  { value: "Maintenance", tone: "butter", icon: IconTools },
-  { value: "Admin", tone: "peri", icon: IconClipboard },
-  { value: "Other", tone: "blush", icon: IconStickyNote },
+// `value` is what the database stores (kept in English so old rows still match); `label` is shown.
+export const TASK_CATEGORIES: ({ value: string; label: string } & CategoryMeta)[] = [
+  { value: "Cleaning", label: "Kebersihan", tone: "mint", icon: IconSpray },
+  { value: "Maintenance", label: "Perawatan", tone: "butter", icon: IconTools },
+  { value: "Admin", label: "Admin", tone: "peri", icon: IconClipboard },
+  { value: "Other", label: "Lainnya", tone: "blush", icon: IconStickyNote },
 ];
 
 export function taskCategoryMeta(category: string | null | undefined): CategoryMeta {
