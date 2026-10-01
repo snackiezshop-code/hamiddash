@@ -5,13 +5,16 @@ import { MONTHS, MONTHS_SHORT, STATUS_LABEL, TZ, formatDate, periodLabel, period
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 import { dueLabel as transferWhen, dueOrder, isDue, transferDue } from "@/lib/transfers";
 import { dueReminders } from "@/lib/reminders";
-import { daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
+import { PROMISE_TAG, daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
+import { openPromises } from "@/lib/promises";
+import { PromiseButton } from "@/components/promise";
 import { startPeriod } from "@/app/actions";
 import { RentProgress } from "@/components/kit";
 import { SubmitButton } from "@/components/forms";
 import { TransferToggle } from "@/components/transfer-toggle";
 import { RoomDrawerProvider, RoomLink } from "@/components/room-drawer";
 import { CollectCard, type CollectItem } from "@/components/collect-card";
+import { PaidButton } from "@/components/paid-button";
 import { IconCheck, IconChevronRight } from "@/components/icons";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -21,12 +24,17 @@ export default async function DashboardPage() {
   await ensureCurrentPeriod();
   const now = todayJakarta();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const [latest, rooms, upcoming, lateCount, rent] = await Promise.all([
+  const [latest, rooms, upcoming, lateCount, rent, promises] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
-    db.reminder.findMany({ where: { isDone: false }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }], take: 4 }),
+    // Payment promises have their own card below, so they stay out of this list.
+    db.reminder.findMany({
+      where: { isDone: false, OR: [{ tag: null }, { tag: { not: PROMISE_TAG } }] },
+      orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }], take: 4,
+    }),
     db.reminder.count({ where: { isDone: false, dueDate: { lt: now } } }),
     dueReminders(now),
+    openPromises(),
   ]);
 
   const curYear = now.getUTCFullYear();
@@ -50,8 +58,9 @@ export default async function DashboardPage() {
     .filter((r) => r.daysUntilDue <= 0)
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue || a.roomNumber - b.roomNumber)
     .map((r) => ({
-      roomNumber: r.roomNumber, tenant: properName(r.tenantName), amount: r.amount, periodLabel: periodLabel(r.year, r.month),
-      daysUntilDue: r.daysUntilDue, waHref: r.waHref,
+      roomId: r.roomId, roomNumber: r.roomNumber, tenant: properName(r.tenantName), phone: r.phone, amount: r.amount,
+      year: r.year, month: r.month, periodLabel: periodLabel(r.year, r.month),
+      daysUntilDue: r.daysUntilDue, waHref: r.waHref, lapsedPromise: r.lapsedPromise,
       incomeId: latest && r.year === latest.year && r.month === latest.month ? incomeByRoom.get(r.roomNumber) ?? null : null,
     }));
 
@@ -62,6 +71,12 @@ export default async function DashboardPage() {
     .filter((x) => isDue(x.due));
   const unsent = transfers.filter((x) => !x.t.isSent).length;
 
+  // Promises still ahead (today or later); lapsed ones are back in Tagih sekarang.
+  const activePromises = rooms
+    .filter((r) => r.tenant && promises.has(r.id) && promises.get(r.id)!.date >= now)
+    .map((r) => ({ room: r, promise: promises.get(r.id)! }))
+    .sort((a, b) => a.promise.date.getTime() - b.promise.date.getTime());
+
   const endingLeases = rooms
     .filter((r) => r.tenant?.leaseEndDate && r.tenant.leaseEndDate <= soon)
     .sort((a, b) => a.tenant!.leaseEndDate!.getTime() - b.tenant!.leaseEndDate!.getTime());
@@ -70,7 +85,7 @@ export default async function DashboardPage() {
   const greeting = hour >= 4 && hour < 11 ? "pagi" : hour >= 11 && hour < 15 ? "siang" : hour >= 15 && hour < 18 ? "sore" : "malam";
 
   return (
-    <RoomDrawerProvider rooms={rooms.map(toDrawerRoom)}>
+    <RoomDrawerProvider rooms={rooms.map((r) => toDrawerRoom(r, promises))}>
       <header className="mb-5">
         <p className="eyebrow text-ink-soft">{HARI[now.getUTCDay()]} / {now.getUTCDate()} {MONTHS_SHORT[now.getUTCMonth()]}</p>
         <h1 className="h-display mt-1.5 text-[1.85rem] leading-[1.08]">Selamat {greeting},<br />Admin.</h1>
@@ -132,6 +147,34 @@ export default async function DashboardPage() {
           </section>
 
           <div className="mt-4"><CollectCard items={collect} /></div>
+
+          {activePromises.length > 0 && (
+            <section className="card mt-4 bg-butter" aria-labelledby="promise-title">
+              <h2 id="promise-title" className="eyebrow text-butter-deep">Janji bayar · {activePromises.length}</h2>
+              <ul className="mt-2 divide-y divide-ink/15">
+                {activePromises.map(({ room: r, promise: p }) => {
+                  const days = daysUntil(p.date, now);
+                  const income = latest.roomIncomes.find((i) => i.roomId === r.id);
+                  return (
+                    <li key={r.id} className="flex min-h-14 items-center gap-3 py-2">
+                      <span className="num grid h-10 w-10 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink bg-card text-sm font-medium" aria-hidden>{r.number}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{properName(r.tenant!.name)}</span>
+                        <span className="num text-xs">
+                          Janji {formatDate(p.date)} · <b className="font-semibold">{reminderDueLabel(days)}</b>
+                        </span>
+                      </span>
+                      <PromiseButton label="Ubah"
+                        target={{ roomId: r.id, roomNumber: r.number, tenantName: properName(r.tenant!.name), phone: r.tenant!.phone,
+                          year: latest.year, month: latest.month, current: { id: p.id, date: p.date } }} />
+                      {income && income.status === "TUNDA_BAYAR" && <PaidButton incomeId={income.id} roomNumber={r.number} />}
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-1 text-xs text-butter-deep">Tidak ditagih sampai tanggal janji; kamu diingatkan sehari sebelumnya dan pada harinya.</p>
+            </section>
+          )}
         </>
       )}
 

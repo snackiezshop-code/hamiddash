@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { daysBetween, dueDateOf, reminderText, shiftMonth, todayJakarta, waLink } from "./format";
+import { openPromises } from "./promises";
 
 // Days before the due date that a reminder is flagged: 3 days ahead, then on the day itself.
 export const REMINDER_OFFSETS = [3, 0] as const;
@@ -11,7 +12,9 @@ const OVERDUE_LOOKBACK_MONTHS = 3;
 
 export type DueReminder = {
   tenantName: string;
+  roomId: string;
   roomNumber: number;
+  phone: string | null;
   amount: number;
   year: number;
   month: number;
@@ -19,6 +22,8 @@ export type DueReminder = {
   alertToday: boolean; // include in today's push alert
   text: string;
   waHref: string | null;
+  // Set when the promised date has passed and the rent is still unpaid ("janji lewat").
+  lapsedPromise: { id: string; date: Date } | null;
 };
 
 const ym = (year: number, month: number) => year * 12 + month;
@@ -36,13 +41,14 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
   const months = Array.from({ length: OVERDUE_LOOKBACK_MONTHS + 2 }, (_, i) =>
     shiftMonth(curYear, curMonth, i - OVERDUE_LOOKBACK_MONTHS)); // past months … this month, next month
 
-  const [tenants, periods, latest] = await Promise.all([
+  const [tenants, periods, latest, promises] = await Promise.all([
     db.tenant.findMany({ where: { reminderDay: { not: null } }, include: { room: true } }),
     db.cashPeriod.findMany({
       where: { OR: months.map((m) => ({ year: m.year, month: m.month })) },
       include: { roomIncomes: { select: { roomId: true, status: true } } },
     }),
     db.cashPeriod.findFirst({ orderBy: [{ year: "desc" }, { month: "desc" }], select: { year: true, month: true } }),
+    openPromises(),
   ]);
   const latestYm = latest ? ym(latest.year, latest.month) : 0;
 
@@ -61,16 +67,21 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
         ? period!.roomIncomes.find((i) => i.roomId === room.id)?.status === "TUNDA_BAYAR"
         : room.status === "LUNAS" || room.status === "TUNDA_BAYAR";
       if (!owes) continue;
+      // A promise to pay by a date that hasn't passed yet: don't chase this room until then.
+      const promise = promises.get(room.id);
+      if (promise && daysBetween(today, promise.date) >= 0) continue;
 
       const text = reminderText({
         name: tenant.name, roomNumber: room.number, amount: room.monthlyRent,
         year: m.year, month: m.month, dueDay: tenant.reminderDay,
       }, today);
       out.push({
-        tenantName: tenant.name, roomNumber: room.number, amount: room.monthlyRent,
+        tenantName: tenant.name, roomId: room.id, roomNumber: room.number, phone: tenant.phone, amount: room.monthlyRent,
         year: m.year, month: m.month, daysUntilDue: days,
-        alertToday: (REMINDER_OFFSETS as readonly number[]).includes(days) || isOverdueAlertDay(-days),
+        // A lapsed promise alerts through its own reminder, so the rent alert stays quiet (no double alert).
+        alertToday: !promise && ((REMINDER_OFFSETS as readonly number[]).includes(days) || isOverdueAlertDay(-days)),
         text, waHref: waLink(tenant.phone, text),
+        lapsedPromise: promise ? { id: promise.id, date: promise.date } : null,
       });
     }
   }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import {
-  IconChevronRight, IconClipboard, IconCoins, IconHuman, IconInvoice, IconMore, IconSpray, IconSprayCan,
+  IconCalendar, IconChevronRight, IconClipboard, IconCoins, IconHuman, IconInvoice, IconMore, IconSpray, IconSprayCan,
   IconStickyNote, IconToolCase, IconTools, IconWaves, IconWifi, IconZap, type AppIcon,
 } from "./icons";
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
@@ -86,6 +86,7 @@ export const TASK_CATEGORIES: ({ value: string; label: string } & CategoryMeta)[
 ];
 
 export function taskCategoryMeta(category: string | null | undefined): CategoryMeta {
+  if (category === "PROMISE") return { tone: "butter", icon: IconCalendar }; // payment promise ("janji bayar")
   const legacy: Record<string, string> = { Perawatan: "Maintenance", Kebersihan: "Cleaning", Lainnya: "Other" };
   const key = category ? legacy[category] ?? category : "Other";
   return TASK_CATEGORIES.find((c) => c.value === key) ?? TASK_CATEGORIES[3];

@@ -4,6 +4,11 @@ import { daysBetween } from "./format";
 // Your own reminders (bills, repairs, admin), as opposed to rent reminders, which come from tenants.
 // Client-safe: no database access here, so the reminder sheet can use the same labels and date maths.
 
+// A tenant's promise to pay rent by a date ("janji bayar") is stored as a reminder with this tag and
+// the room's id. While it's open and not yet due, that room's rent isn't chased; marking the room
+// paid closes it.
+export const PROMISE_TAG = "PROMISE";
+
 export const REPEAT_OPTIONS: Repeat[] = ["NONE", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"];
 
 export const REPEAT_LABEL: Record<Repeat, string> = {

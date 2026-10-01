@@ -223,6 +223,27 @@ export function properName(name: string | null | undefined) {
   return (name ?? "").trim().toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 }
 
+// "Selasa, 6 Oktober 2026" for a Jakarta calendar date stored as UTC midnight.
+export function longDateId(d: Date) {
+  return `${DAYS_ID[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS_ID[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// WhatsApp confirmation after a tenant promises to pay by a date, so the promise is in writing.
+export function promiseText(p: { name: string; roomNumber: number; year: number; month: number; date: Date }) {
+  const name = properName(p.name);
+  return [
+    name ? `Assalamualaikum ${name},` : "Assalamualaikum,",
+    "",
+    `Kami catat pembayaran sewa *Kamar ${p.roomNumber}* bulan ${MONTHS_ID[p.month - 1]} ${p.year} akan dilunasi pada *${longDateId(p.date)}*.`,
+    "",
+    "Pembayaran dapat ditransfer ke:",
+    `*Bank ${PAYMENT_ACCOUNT.bank} ${PAYMENT_ACCOUNT.number}*`,
+    `a.n. ${PAYMENT_ACCOUNT.holder}`,
+    "",
+    "Terima kasih 🙏",
+  ].join("\n");
+}
+
 export function parseAmount(v: FormDataEntryValue | null) {
   const n = Number(String(v ?? "").replace(/[^\d-]/g, ""));
   return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;

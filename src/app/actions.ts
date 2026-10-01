@@ -12,7 +12,7 @@ import { dueReminders } from "@/lib/reminders";
 import {
   CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, todayJakarta,
 } from "@/lib/format";
-import { REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
+import { PROMISE_TAG, REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
 import type { ExpenseCategory, Repeat, RoomStatus } from "@/generated/prisma/enums";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -168,6 +168,16 @@ export async function updateRoomIncome(form: FormData) {
   if (await isLatestPeriod(income.periodId)) {
     await db.room.update({ where: { id: income.roomId }, data: { status } });
   }
+  // A payment promise ends when the room is paid. Setting it back to unpaid right after (the
+  // toast's Batalkan) reopens the promise that payment just closed.
+  if (status === "LUNAS" || status === "TAHUNAN") {
+    await db.reminder.updateMany({ where: { tag: PROMISE_TAG, roomId: income.roomId, isDone: false }, data: { isDone: true, doneAt: new Date() } });
+  } else if (status === "TUNDA_BAYAR" && income.status !== "TUNDA_BAYAR") {
+    await db.reminder.updateMany({
+      where: { tag: PROMISE_TAG, roomId: income.roomId, isDone: true, doneAt: { gte: new Date(Date.now() - 15 * 60 * 1000) } },
+      data: { isDone: false, doneAt: null },
+    });
+  }
   await recarryBalances(income.period.year, income.period.month);
   refresh();
 }
@@ -309,6 +319,32 @@ function reminderError(data: ReturnType<typeof reminderData>) {
 }
 
 // These return an error message for the sheet to show, or undefined on success.
+// ---------- Payment promises ("janji bayar") ----------
+
+// Records that a tenant promised to pay by a date. One open promise per room: a second one moves the date.
+export async function savePaymentPromise(form: FormData) {
+  await requireAdmin();
+  const room = await db.room.findUnique({ where: { id: str(form, "roomId") }, include: { tenant: true } });
+  if (!room) return "Kamar itu sudah tidak ada.";
+  const date = optDate(form, "date");
+  if (!date || Number.isNaN(date.getTime())) return "Pilih tanggal janji bayar.";
+  if (date < todayJakarta()) return "Tanggal janji tidak boleh sebelum hari ini.";
+  const title = `Janji bayar · ${room.tenant?.name ?? "Penghuni"} · Kamar ${room.number}`;
+  const open = await db.reminder.findFirst({ where: { tag: PROMISE_TAG, roomId: room.id, isDone: false } });
+  if (open) {
+    await db.reminder.update({ where: { id: open.id }, data: { dueDate: date, title } });
+  } else {
+    await db.reminder.create({ data: { title, tag: PROMISE_TAG, roomId: room.id, dueDate: date, remindBefore: 1 } });
+  }
+  refresh();
+}
+
+export async function deletePaymentPromise(form: FormData) {
+  await requireAdmin();
+  await db.reminder.deleteMany({ where: { id: str(form, "id"), tag: PROMISE_TAG } });
+  refresh();
+}
+
 export async function addReminder(form: FormData) {
   await requireAdmin();
   const data = reminderData(form);

@@ -10,6 +10,7 @@ import { Sheet } from "./kit-client";
 import { ConfirmButton } from "./forms";
 import { IconBed, IconEdit } from "./icons";
 import { PaidButton } from "./paid-button";
+import { PromiseButton } from "./promise";
 import { useQuickAdd } from "./quick-add";
 import { StatusPill, WaButton } from "./ui";
 
@@ -27,6 +28,7 @@ export type DrawerRoom = {
     notes: string | null;
   } | null;
   history: { id: string; year: number; month: number; status: RoomStatus; amount: number }[];
+  promise: { id: string; date: Date } | null; // open payment promise ("janji bayar")
 };
 
 // A room opens as this sheet wherever it's tapped (Rooms list, Overview tiles, search): quick
@@ -152,6 +154,14 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
               {t && <WaButton iconOnly phone={t.phone} label={`Kirim pengingat WhatsApp ke ${t.name}`}
                 text={reminderText({ name: t.name, roomNumber: room.number, amount: room.monthlyRent, year: current.year, month: current.month, dueDay: t.reminderDay })} />}
               <PaidButton incomeId={current.id} roomNumber={room.number} />
+            </div>
+          )}
+          {owes && current && t && (
+            <div className="-mt-1 flex items-center justify-between gap-3">
+              <p className="text-sm text-ink-soft">
+                {room.promise ? <>Janji lunas <b className="num font-semibold text-ink">{formatDate(room.promise.date)}</b></> : "Minta tunda? Catat tanggal janjinya."}
+              </p>
+              <PromiseButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, phone: t.phone, year: current.year, month: current.month, current: room.promise }} />
             </div>
           )}
 

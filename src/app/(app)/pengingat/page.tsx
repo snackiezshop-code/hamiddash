@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { dueReminders, type DueReminder } from "@/lib/reminders";
 import { daysUntil, dueLabel } from "@/lib/reminder-items";
-import { periodLabel, properName, rupiah, todayJakarta } from "@/lib/format";
+import { formatDate, periodLabel, properName, rupiah, todayJakarta } from "@/lib/format";
+import { PromiseButton } from "@/components/promise";
 import { Empty, PageHeader, Section } from "@/components/ui";
 import { SegmentedLinks } from "@/components/kit-client";
 import { PushToggle } from "@/components/push-toggle";
@@ -88,6 +89,7 @@ function RentList({ items }: { items: DueReminder[] }) {
                 <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-soft">
                   <span className="num">{rupiah(r.amount)} · {periodLabel(r.year, r.month)}</span>
                   <span className={`font-semibold ${late ? "text-orange-text" : "text-ink"}`}>{dueLabel(r.daysUntilDue)}</span>
+                  {r.lapsedPromise && <span className="font-semibold text-orange-text">· janji lewat {formatDate(r.lapsedPromise.date)}</span>}
                 </div>
               </div>
               {r.waHref ? (
@@ -97,6 +99,10 @@ function RentList({ items }: { items: DueReminder[] }) {
               ) : (
                 <span className="text-xs text-ink-soft">Belum ada nomor WA</span>
               )}
+            </div>
+            <div className="flex justify-end pl-14">
+              <PromiseButton target={{ roomId: r.roomId, roomNumber: r.roomNumber, tenantName: properName(r.tenantName), phone: r.phone,
+                year: r.year, month: r.month, current: r.lapsedPromise }} label={r.lapsedPromise ? "Janji baru" : "Janji bayar"} />
             </div>
             <details className="pl-14">
               <summary className="eyebrow inline-flex min-h-11 cursor-pointer items-center text-ink-soft hover:text-ink">Lihat pesan</summary>

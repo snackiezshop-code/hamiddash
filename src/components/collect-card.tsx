@@ -2,23 +2,29 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { rupiah } from "@/lib/format";
+import { formatDate, rupiah } from "@/lib/format";
 import { dueLabel } from "@/lib/reminder-items";
 import { IconChevronRight, IconWhatsApp } from "./icons";
 import { PaidButton } from "./paid-button";
+import { PromiseButton } from "./promise";
 
 export type CollectItem = {
+  roomId: string;
   roomNumber: number;
   tenant: string;
+  phone: string | null;
+  year: number;
+  month: number;
   amount: number;
   periodLabel: string;
   daysUntilDue: number; // 0 today, negative once late
   waHref: string | null;
   incomeId: string | null; // set when the row is in the current cash book, so it can be marked paid here
+  lapsedPromise: { id: string; date: Date } | null; // promised date passed, still unpaid
 };
 
 // Rent to collect now (due today or late), one tenant at a time: send the WhatsApp reminder or
-// mark it paid, then step to the next with Berikutnya.
+// mark it paid, or record a promise to pay later (janji bayar), then step to the next with →.
 export function CollectCard({ items }: { items: CollectItem[] }) {
   const [i, setI] = useState(0);
   const item = items.length ? items[i % items.length] : null;
@@ -40,6 +46,11 @@ export function CollectCard({ items }: { items: CollectItem[] }) {
             <span className="num"><b className="font-semibold text-ink">{rupiah(item.amount)}</b> · {item.periodLabel}</span>
             <span className={`font-medium ${item.daysUntilDue < 0 ? "text-orange-text" : "text-ink"}`}>{dueLabel(item.daysUntilDue)}</span>
           </p>
+          {item.lapsedPromise && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-[3px] border-[1.5px] border-orange-text px-2 py-1 text-xs font-semibold text-orange-text">
+              Janji lewat · {formatDate(item.lapsedPromise.date)}
+            </p>
+          )}
           <div className="mt-4 h-[5px] bg-navy" aria-hidden />
           <div className="mt-4 flex items-center gap-3">
             {item.waHref ? (
@@ -60,6 +71,13 @@ export function CollectCard({ items }: { items: CollectItem[] }) {
                 <IconChevronRight width={20} />
               </button>
             )}
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+            <span className="text-xs text-ink-soft">{item.lapsedPromise ? "Janji baru?" : "Minta tunda?"}</span>
+            <PromiseButton key={item.roomId} target={{
+              roomId: item.roomId, roomNumber: item.roomNumber, tenantName: item.tenant, phone: item.phone, year: item.year, month: item.month,
+              current: item.lapsedPromise,
+            }} label={item.lapsedPromise ? "Janji baru" : "Catat janji bayar"} />
           </div>
         </div>
       )}

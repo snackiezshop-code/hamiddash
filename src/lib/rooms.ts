@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { DrawerRoom } from "@/components/room-drawer";
 import { properName } from "./format";
+import type { OpenPromise } from "./promises";
 
 // Prisma include + mapper shared by every page that can open the room drawer.
 export const drawerRoomInclude = {
@@ -21,9 +22,12 @@ type RoomWithDrawerData = {
   roomIncomes: { id: string; status: DrawerRoom["status"]; amount: number; period: { year: number; month: number } }[];
 };
 
-export function toDrawerRoom(r: RoomWithDrawerData): DrawerRoom {
+// `promises`: open payment promises by room id (from openPromises()), so the sheet can show and edit them.
+export function toDrawerRoom(r: RoomWithDrawerData, promises?: Map<string, OpenPromise>): DrawerRoom {
+  const p = promises?.get(r.id);
   return {
     id: r.id, number: r.number, status: r.status, monthlyRent: r.monthlyRent,
+    promise: p ? { id: p.id, date: p.date } : null,
     tenant: r.tenant && {
       name: properName(r.tenant.name), phone: r.tenant.phone, reminderDay: r.tenant.reminderDay,
       moveInDate: r.tenant.moveInDate, leaseEndDate: r.tenant.leaseEndDate, notes: r.tenant.notes,

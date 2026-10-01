@@ -4,6 +4,7 @@ import { getLatestPeriod } from "./cashbook";
 import { formatDate, periodLabel, periodSlug, properName, reminderText, rupiah, todayJakarta, waLink } from "./format";
 import { isDue, transferDue } from "./transfers";
 import { dueItems, dueReminders } from "./reminders";
+import { openPromises } from "./promises";
 import { dueLabel as reminderDueLabel } from "./reminder-items";
 import type { Notification } from "@/components/notification-bell";
 
@@ -11,7 +12,7 @@ import type { Notification } from "@/components/notification-bell";
 // that is late or due today, unpaid rooms, leases ending, and transfers not yet sent.
 export async function getNotifications(now: Date = todayJakarta()): Promise<Notification[]> {
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const [latest, endingLeases, rent, items] = await Promise.all([
+  const [latest, endingLeases, rent, items, promises] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({
       where: { tenant: { leaseEndDate: { not: null, lte: soon } } },
@@ -20,6 +21,7 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
     }),
     dueReminders(now),
     dueItems(now),
+    openPromises(),
   ]);
 
   const curYear = now.getUTCFullYear();
@@ -29,7 +31,9 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
   const slug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
 
   const overdueCount = rent.filter((r) => r.daysUntilDue < 0).length;
-  const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
+  // Rooms with a promise still ahead aren't chased; the promise itself alerts the day before and on the day.
+  const promisedAhead = (roomId: string) => { const p = promises.get(roomId); return Boolean(p && p.date >= now); };
+  const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR" && !promisedAhead(r.roomId)) ?? [];
   const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
   const dueTodayIds = new Set(dueToday.map((d) => d.id));
   const transfers = (latest?.transferChecks ?? [])
