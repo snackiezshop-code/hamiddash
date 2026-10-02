@@ -49,8 +49,15 @@ export default async function RoomDetailPage({ params }: PageProps<"/kamar/[numb
                 <label className="label" htmlFor="monthlyRent">Sewa per bulan (Rp)</label>
                 <AmountInput id="monthlyRent" name="monthlyRent" defaultValue={room.monthlyRent} className="field num" required />
               </div>
+              <div className="sm:col-span-2">
+                <label className="label" htmlFor="annualRent">Sewa per tahun (Rp) · untuk status Tahunan</label>
+                <AmountInput id="annualRent" name="annualRent" defaultValue={room.annualRent} className="field num" placeholder="3.500.000" />
+              </div>
             </div>
-            <p className="mt-2 text-xs text-ink-soft">Mengubah status juga mengubah baris kamar ini di buku kas bulan terakhir.</p>
+            <p className="mt-2 text-xs text-ink-soft">
+              Mengubah status juga mengubah baris kamar ini di buku kas bulan terakhir. Kamar tahunan: isi sewa per tahun dan
+              &quot;Kontrak sampai&quot; (akhir masa sewa yang sudah dibayar); pengingat perpanjangan muncul 7 hari sebelumnya.
+            </p>
           </div>
 
           <div>

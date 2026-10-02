@@ -87,7 +87,7 @@ function RentList({ items }: { items: DueReminder[] }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">Kamar {r.roomNumber} · {properName(r.tenantName)}</div>
                 <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-soft">
-                  <span className="num">{rupiah(r.amount)} · {periodLabel(r.year, r.month)}</span>
+                  <span className="num">{rupiah(r.amount)} · {r.annual ? `${r.annual.partial ? "sisa sewa tahunan" : "sewa tahunan"} ${r.annual.termLabel}` : periodLabel(r.year, r.month)}</span>
                   <span className={`font-semibold ${late ? "text-orange-text" : "text-ink"}`}>{dueLabel(r.daysUntilDue)}</span>
                   {r.lapsedPromise && <span className="font-semibold text-orange-text">· janji lewat {formatDate(r.lapsedPromise.date)}</span>}
                 </div>

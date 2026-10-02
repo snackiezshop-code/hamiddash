@@ -7,6 +7,7 @@ import { dueLabel } from "@/lib/reminder-items";
 import { IconChevronRight, IconWhatsApp } from "./icons";
 import { PaidButton } from "./paid-button";
 import { PromiseButton } from "./promise";
+import { AnnualPayButton } from "./annual";
 
 export type CollectItem = {
   roomId: string;
@@ -21,6 +22,8 @@ export type CollectItem = {
   waHref: string | null;
   incomeId: string | null; // set when the row is in the current cash book, so it can be marked paid here
   lapsedPromise: { id: string; date: Date } | null; // promised date passed, still unpaid
+  // Yearly rent (renewal or the rest of a part-paid term) instead of a month's rent.
+  annual: { rent: number; remaining: number; paid: number; partial: boolean; termLabel: string } | null;
 };
 
 // Rent to collect now (due today or late), one tenant at a time: send the WhatsApp reminder or
@@ -43,7 +46,7 @@ export function CollectCard({ items }: { items: CollectItem[] }) {
           <p className="mt-2 text-2xl leading-tight font-medium tracking-[-0.01em] break-words">{item.tenant}</p>
           <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
             <Link href={`/kamar/${item.roomNumber}`} className="pill text-ink">Kamar {item.roomNumber}</Link>
-            <span className="num"><b className="font-semibold text-ink">{rupiah(item.amount)}</b> · {item.periodLabel}</span>
+            <span className="num"><b className="font-semibold text-ink">{rupiah(item.amount)}</b> · {item.annual ? `${item.annual.partial ? "sisa sewa tahunan" : "sewa tahunan"} ${item.annual.termLabel}` : item.periodLabel}</span>
             <span className={`font-medium ${item.daysUntilDue < 0 ? "text-orange-text" : "text-ink"}`}>{dueLabel(item.daysUntilDue)}</span>
           </p>
           {item.lapsedPromise && (
@@ -65,6 +68,10 @@ export function CollectCard({ items }: { items: CollectItem[] }) {
               </a>
             ) : <span className="min-w-0 flex-1 text-sm text-ink-soft">Nomor WhatsApp belum disimpan.</span>}
             {item.incomeId && <PaidButton incomeId={item.incomeId} roomNumber={item.roomNumber} />}
+            {item.annual && (
+              <AnnualPayButton key={`pay-${item.roomId}`} label="Bayar" className="btn-primary btn-sm"
+                target={{ roomId: item.roomId, roomNumber: item.roomNumber, tenantName: item.tenant, ...item.annual }} />
+            )}
             {items.length > 1 && (
               <button type="button" onClick={() => setI((n) => n + 1)} aria-label="Penghuni berikutnya"
                 className="press grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-[4px] border-[1.5px] border-ink bg-card shadow-[2px_2px_0_var(--color-ink)] hover:bg-cream">

@@ -7,6 +7,8 @@ import { dueLabel as transferWhen, dueOrder, isDue, transferDue } from "@/lib/tr
 import { dueReminders } from "@/lib/reminders";
 import { PROMISE_TAG, daysUntil, dueLabel as reminderDueLabel } from "@/lib/reminder-items";
 import { openPromises } from "@/lib/promises";
+import { annualStates } from "@/lib/annual";
+import { AnnualPayButton } from "@/components/annual";
 import { PromiseButton } from "@/components/promise";
 import { startPeriod } from "@/app/actions";
 import { RentProgress } from "@/components/kit";
@@ -24,7 +26,7 @@ export default async function DashboardPage() {
   await ensureCurrentPeriod();
   const now = todayJakarta();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const [latest, rooms, upcoming, lateCount, rent, promises] = await Promise.all([
+  const [latest, rooms, upcoming, lateCount, rent, promises, annual] = await Promise.all([
     getLatestPeriod(),
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
     // Payment promises have their own card below, so they stay out of this list.
@@ -35,6 +37,7 @@ export default async function DashboardPage() {
     db.reminder.count({ where: { isDone: false, dueDate: { lt: now } } }),
     dueReminders(now),
     openPromises(),
+    annualStates(now),
   ]);
 
   const curYear = now.getUTCFullYear();
@@ -44,9 +47,10 @@ export default async function DashboardPage() {
   const label = latest ? periodLabel(latest.year, latest.month) : "";
   const slug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
 
+  // Monthly rent only: yearly rooms are paid once a year and tracked in their own card.
   const rentRooms = (latest?.roomIncomes ?? [])
-    .filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK")
-    .map((r) => ({ id: r.id, number: r.room.number, paid: r.status === "LUNAS" || r.status === "TAHUNAN" }));
+    .filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK" && r.status !== "TAHUNAN")
+    .map((r) => ({ id: r.id, number: r.room.number, paid: r.status === "LUNAS" }));
   const rentPaid = rentRooms.filter((r) => r.paid).length;
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
   const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
@@ -61,8 +65,14 @@ export default async function DashboardPage() {
       roomId: r.roomId, roomNumber: r.roomNumber, tenant: properName(r.tenantName), phone: r.phone, amount: r.amount,
       year: r.year, month: r.month, periodLabel: periodLabel(r.year, r.month),
       daysUntilDue: r.daysUntilDue, waHref: r.waHref, lapsedPromise: r.lapsedPromise,
-      incomeId: latest && r.year === latest.year && r.month === latest.month ? incomeByRoom.get(r.roomNumber) ?? null : null,
+      incomeId: r.kind === "monthly" && latest && r.year === latest.year && r.month === latest.month ? incomeByRoom.get(r.roomNumber) ?? null : null,
+      annual: r.kind === "annual" && annual.get(r.roomId) ? (() => {
+        const a = annual.get(r.roomId)!;
+        return { rent: a.rent, remaining: a.remaining, paid: a.paid, partial: a.partial, termLabel: a.termLabel };
+      })() : null,
     }));
+  // Yearly rent coming up (8 to 30 days away); from 7 days it's in Tagih sekarang instead.
+  const annualSoon = [...annual.values()].filter((a) => !a.partial && a.daysUntilDue > 7 && a.daysUntilDue <= 30);
 
   const transfers = (latest?.transferChecks ?? [])
     .filter((t) => t.recipient.isActive || t.isSent)
@@ -85,7 +95,7 @@ export default async function DashboardPage() {
   const greeting = hour >= 4 && hour < 11 ? "pagi" : hour >= 11 && hour < 15 ? "siang" : hour >= 15 && hour < 18 ? "sore" : "malam";
 
   return (
-    <RoomDrawerProvider rooms={rooms.map((r) => toDrawerRoom(r, promises))}>
+    <RoomDrawerProvider rooms={rooms.map((r) => toDrawerRoom(r, promises, annual))}>
       <header className="mb-5">
         <p className="eyebrow text-ink-soft">{HARI[now.getUTCDay()]} / {now.getUTCDate()} {MONTHS_SHORT[now.getUTCMonth()]}</p>
         <h1 className="h-display mt-1.5 text-[1.85rem] leading-[1.08]">Selamat {greeting},<br />Admin.</h1>
@@ -148,6 +158,19 @@ export default async function DashboardPage() {
 
           <div className="mt-4"><CollectCard items={collect} /></div>
 
+          {annualSoon.map((a) => (
+            <section key={a.roomId} className="card mt-4 bg-mint" aria-label={`Sewa tahunan kamar ${a.roomNumber}`}>
+              <p className="eyebrow">Sewa tahunan · Kamar {a.roomNumber}</p>
+              <p className="mt-1.5 text-sm">
+                <b className="font-semibold">{properName(a.tenantName)}</b> · kontrak berakhir <b className="num">{formatDate(a.dueDate)}</b> ({reminderDueLabel(a.daysUntilDue).toLowerCase()}).
+                Perpanjangan {a.termLabel}: <b className="num">{rupiah(a.rent)}</b>.
+              </p>
+              <div className="mt-3 flex justify-end">
+                <AnnualPayButton target={{ roomId: a.roomId, roomNumber: a.roomNumber, tenantName: properName(a.tenantName), rent: a.rent, remaining: a.remaining, paid: a.paid, partial: a.partial, termLabel: a.termLabel }} />
+              </div>
+            </section>
+          ))}
+
           {activePromises.length > 0 && (
             <section className="card mt-4 bg-butter" aria-labelledby="promise-title">
               <h2 id="promise-title" className="eyebrow text-butter-deep">Janji bayar · {activePromises.length}</h2>
@@ -185,19 +208,23 @@ export default async function DashboardPage() {
         </div>
         <div className="mt-3 grid grid-cols-8 gap-1.5">
           {rooms.map((r) => {
-            const paid = r.status === "LUNAS" || r.status === "TAHUNAN";
+            const yearly = annual.get(r.id);
+            // Yearly rooms: striped navy while paid up, orange once the renewal or the rest is due.
+            const yearlyDue = Boolean(yearly && (yearly.partial || yearly.daysUntilDue <= 0));
+            const paid = r.status === "LUNAS" || (r.status === "TAHUNAN" && !yearlyDue);
             return (
               <RoomLink key={r.id} roomNumber={r.number}
                 aria-label={`Kamar ${r.number}, ${r.tenant ? properName(r.tenant.name) : "tanpa penghuni"}, ${STATUS_LABEL[r.status]}`}
                 className={`num grid aspect-square min-h-9 place-items-center rounded-[3px] border-[1.5px] border-ink text-[0.8rem] font-medium transition-transform active:scale-90 ${
-                  paid ? "bg-navy text-white" : r.status === "TUNDA_BAYAR" ? "bg-orange text-white" : "bg-card"}`}
-                style={r.status === "RUSAK" ? { background: "repeating-linear-gradient(135deg, var(--color-card) 0 4px, var(--color-ink) 4px 5.5px)" } : undefined}>
+                  paid ? "bg-navy text-white" : r.status === "TUNDA_BAYAR" || yearlyDue ? "bg-orange text-white" : "bg-card"}`}
+                style={r.status === "RUSAK" ? { background: "repeating-linear-gradient(135deg, var(--color-card) 0 4px, var(--color-ink) 4px 5.5px)" }
+                  : r.status === "TAHUNAN" ? { backgroundImage: "repeating-linear-gradient(135deg, transparent 0 5px, rgb(255 255 255 / 0.28) 5px 7px)" } : undefined}>
                 <span className={r.status === "RUSAK" ? "bg-card px-0.5" : ""}>{r.number}</span>
               </RoomLink>
             );
           })}
         </div>
-        <p className="mt-2 text-xs text-ink-soft">Navy lunas · oranye belum bayar · putih kosong · arsir rusak. Ketuk kamar untuk aksi cepat.</p>
+        <p className="mt-2 text-xs text-ink-soft">Navy lunas · oranye belum bayar · garis-garis tahunan · putih kosong · arsir rusak. Ketuk kamar untuk aksi cepat.</p>
       </section>
 
       {endingLeases.length > 0 && (

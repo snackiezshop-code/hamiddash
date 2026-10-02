@@ -13,6 +13,7 @@ import {
   CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, properName, todayJakarta,
 } from "@/lib/format";
 import { PROMISE_TAG, REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
+import { addMonths, annualStates } from "@/lib/annual";
 import type { ExpenseCategory, Repeat, RoomStatus } from "@/generated/prisma/enums";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -62,9 +63,10 @@ export async function updateRoom(form: FormData) {
   const roomId = str(form, "roomId");
   const status = asStatus(str(form, "status"));
   const monthlyRent = parseAmount(form.get("monthlyRent"));
+  const annualRent = parseAmount(form.get("annualRent")) || null;
   const tenantName = str(form, "tenantName");
 
-  await db.room.update({ where: { id: roomId }, data: { status, monthlyRent } });
+  await db.room.update({ where: { id: roomId }, data: { status, monthlyRent, annualRent } });
 
   if (tenantName) {
     const data = {
@@ -208,17 +210,81 @@ export async function addAdditionalIncome(form: FormData) {
 
 export async function deleteAdditionalIncome(form: FormData) {
   await requireAdmin();
-  const row = await db.additionalIncome.delete({ where: { id: str(form, "id") }, include: { period: true } });
+  await removeIncome(str(form, "id"));
+  refresh();
+}
+
+// Deletes an income row. For a yearly-rent instalment that was the only payment toward the term
+// it opened, the term end goes back 12 months, as if it was never recorded.
+async function removeIncome(id: string) {
+  const row = await db.additionalIncome.delete({ where: { id }, include: { period: true } });
+  if (row.annualRoomId && row.annualTermEnd) {
+    const left = await db.additionalIncome.count({ where: { annualRoomId: row.annualRoomId, annualTermEnd: row.annualTermEnd } });
+    const tenant = await db.tenant.findUnique({ where: { roomId: row.annualRoomId } });
+    if (left === 0 && tenant?.leaseEndDate?.getTime() === row.annualTermEnd.getTime()) {
+      await db.tenant.update({ where: { id: tenant.id }, data: { leaseEndDate: addMonths(row.annualTermEnd, -12) } });
+    }
+  }
   await recarryBalances(row.period.year, row.period.month);
+}
+
+// ---------- Yearly rent ----------
+
+// Records a yearly-rent instalment in this month's cash book as Pemasukan lain. The first payment
+// toward a new term moves the term end forward 12 months; later ones pay off the rest of that term.
+// Returns the new row's id (for Batalkan) or an error message.
+export async function recordAnnualPayment(form: FormData): Promise<{ id: string } | string> {
+  await requireAdmin();
+  const roomId = str(form, "roomId");
+  const amount = parseAmount(form.get("amount"));
+  if (amount <= 0) return "Isi jumlah lebih dari 0.";
+  const today = todayJakarta();
+  const state = (await annualStates(today)).get(roomId);
+  if (!state) return "Isi dulu sewa tahunan dan tanggal kontrak sampai di halaman edit kamar.";
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth() + 1;
+  const period = await db.cashPeriod.findUnique({ where: { year_month: { year, month } } });
+  if (!period) return `Mulai buku kas ${periodLabel(year, month)} dulu.`;
+
+  const count = await db.additionalIncome.count({ where: { annualRoomId: roomId, annualTermEnd: state.payTermEnd } });
+  const what = amount >= state.remaining ? (count ? "pelunasan" : "lunas") : `cicilan ${count + 1}`;
+  const row = await db.additionalIncome.create({
+    data: {
+      periodId: period.id, amount, annualRoomId: roomId, annualTermEnd: state.payTermEnd,
+      description: `Sewa tahunan · Kamar ${state.roomNumber} · ${what} · ${state.termLabel}`,
+    },
+  });
+  if (!state.partial) {
+    await db.tenant.update({ where: { roomId }, data: { leaseEndDate: state.payTermEnd } });
+  }
+  // Paying off what's owed ends any payment promise for this room.
+  if (amount >= state.remaining) {
+    await db.reminder.updateMany({ where: { tag: PROMISE_TAG, roomId, isDone: false }, data: { isDone: true, doneAt: new Date() } });
+  }
+  await recarryBalances(year, month);
+  refresh();
+  return { id: row.id };
+}
+
+export async function undoAnnualPayment(form: FormData) {
+  await requireAdmin();
+  const id = str(form, "id");
+  const row = await db.additionalIncome.findUnique({ where: { id } });
+  if (!row?.annualRoomId) return;
+  await removeIncome(id);
+  await db.reminder.updateMany({
+    where: { tag: PROMISE_TAG, roomId: row.annualRoomId, isDone: true, doneAt: { gte: new Date(Date.now() - 15 * 60 * 1000) } },
+    data: { isDone: false, doneAt: null },
+  });
   refresh();
 }
 
 // "Other" needs a typed-in name so the cash book says what the money was for.
 function expenseCategory(form: FormData) {
   const category = str(form, "category") as ExpenseCategory;
-  if (!CATEGORY_OPTIONS.includes(category)) return { error: "Choose a category." } as const;
+  if (!CATEGORY_OPTIONS.includes(category)) return { error: "Pilih kategori." } as const;
   const categoryLabel = category === "LAINNYA" ? optStr(form, "categoryLabel") : null;
-  if (category === "LAINNYA" && !categoryLabel) return { error: "Type a name for the Other category." } as const;
+  if (category === "LAINNYA" && !categoryLabel) return { error: "Isi nama untuk kategori Lainnya." } as const;
   return { category, categoryLabel } as const;
 }
 

@@ -92,7 +92,10 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
   }
 
   const s = summarize(period);
-  const paidCount = period.roomIncomes.filter((r) => r.status === "LUNAS" || r.status === "TAHUNAN").length;
+  // Yearly rooms pay once a year (recorded under Pemasukan lain), so the monthly rent list leaves them out.
+  const monthlyIncomes = period.roomIncomes.filter((r) => r.status !== "TAHUNAN");
+  const yearlyRooms = period.roomIncomes.filter((r) => r.status === "TAHUNAN").map((r) => r.room.number);
+  const paidCount = monthlyIncomes.filter((r) => r.status === "LUNAS").length;
   // The monthly recipients plus the heir whose turn it is first; the other heirs after, faded.
   const transfers = period.transferChecks
     .filter((t) => t.recipient.isActive || t.isSent)
@@ -185,10 +188,10 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
       )}
 
       {tab === "rent" && (
-        <Section title={`Sewa kamar · ${paidCount}/${period.roomIncomes.length} lunas`}>
+        <Section title={`Sewa kamar · ${paidCount}/${monthlyIncomes.length} lunas`}>
           <p className="-mt-1 mb-2 text-xs text-ink-soft">Ubah status atau jumlah; tersimpan otomatis.</p>
           <ul className="divide-y divide-line">
-            {period.roomIncomes.map((inc) => {
+            {monthlyIncomes.map((inc) => {
               const tenant = inc.room.tenant;
               const name = tenant ? properName(tenant.name) : null;
               return (
@@ -223,6 +226,9 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
               );
             })}
           </ul>
+          {yearlyRooms.length > 0 && (
+            <p className="mt-2 text-xs text-ink-soft">Kamar {yearlyRooms.join(", ")} bayar tahunan; pembayarannya tercatat di Ringkasan → Pemasukan lain.</p>
+          )}
           <div className="mt-2 flex min-h-12 items-center justify-between border-t-[1.5px] border-ink text-sm font-semibold">
             <span>Total sewa kamar</span>
             <span className="num">{rupiah(s.roomTotal)}</span>

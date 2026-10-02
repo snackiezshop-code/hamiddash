@@ -6,15 +6,17 @@ import { RoomSearch } from "@/components/room-search";
 import { drawerRoomInclude, toDrawerRoom } from "@/lib/rooms";
 import { ensureCurrentPeriod } from "@/lib/cashbook";
 import { openPromises } from "@/lib/promises";
+import { annualStates } from "@/lib/annual";
 
 export default async function RoomsPage() {
   await ensureCurrentPeriod();
-  const [rooms, promises] = await Promise.all([
+  const [rooms, promises, annual] = await Promise.all([
     db.room.findMany({ orderBy: { number: "asc" }, include: drawerRoomInclude }),
     openPromises(),
+    annualStates(),
   ]);
   const potential = rooms.reduce((s, r) => s + r.monthlyRent, 0);
-  const drawerRooms = rooms.map((r) => toDrawerRoom(r, promises));
+  const drawerRooms = rooms.map((r) => toDrawerRoom(r, promises, annual));
 
   return (
     <RoomDrawerProvider rooms={drawerRooms}>

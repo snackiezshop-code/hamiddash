@@ -244,6 +244,43 @@ export function promiseText(p: { name: string; roomNumber: number; year: number;
   ].join("\n");
 }
 
+// WhatsApp reminder for yearly rent: a renewal (the term ends or has ended) or the rest of a
+// term already part-paid. The opening adapts to how far the due date is from today.
+export function annualText(a: {
+  name: string; roomNumber: number; amount: number; paid: number; partial: boolean;
+  dueDate: Date; daysUntilDue: number; termLabel: string;
+}) {
+  const name = properName(a.name);
+  const d = a.daysUntilDue;
+  const when = longDateId(a.dueDate);
+  const room = `*Kamar ${a.roomNumber}* (Kost Mujair 12)`;
+  const opening = a.partial
+    ? `Kami ingin mengingatkan sisa pembayaran sewa tahunan ${room} untuk periode ${a.termLabel}.`
+    : d > 1 ? `Kami ingin mengingatkan bahwa masa sewa tahunan ${room} akan berakhir dalam ${d} hari, pada *${when}*.`
+    : d === 1 ? `Kami ingin mengingatkan bahwa masa sewa tahunan ${room} berakhir *besok*, ${when}.`
+    : d === 0 ? `Kami ingin mengingatkan bahwa masa sewa tahunan ${room} berakhir *hari ini*, ${when}.`
+    : `Kami ingin menginformasikan bahwa masa sewa tahunan ${room} telah berakhir pada ${when} (${-d} hari lalu).`;
+  const lines = a.partial
+    ? [`• Periode: ${a.termLabel}`, `• Sudah dibayar: ${rupiah(a.paid)}`, `• Sisa: *${rupiah(a.amount)}*`]
+    : [`• Perpanjangan: ${a.termLabel}`, `• Jumlah: *${rupiah(a.amount)}*`];
+  return [
+    name ? `Assalamualaikum ${name},` : "Assalamualaikum,",
+    "",
+    opening,
+    "",
+    ...lines,
+    "",
+    "Pembayaran dapat ditransfer ke:",
+    `*Bank ${PAYMENT_ACCOUNT.bank} ${PAYMENT_ACCOUNT.number}*`,
+    `a.n. ${PAYMENT_ACCOUNT.holder}`,
+    "",
+    a.partial ? "Setelah transfer, mohon kirimkan bukti pembayaran di chat ini." : "Mohon kabari kami apakah akan melanjutkan sewa. Setelah transfer, kirimkan bukti pembayaran di chat ini.",
+    "",
+    "Terima kasih atas kerja samanya 🙏",
+    "Wassalamualaikum.",
+  ].join("\n");
+}
+
 export function parseAmount(v: FormDataEntryValue | null) {
   const n = Number(String(v ?? "").replace(/[^\d-]/g, ""));
   return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;

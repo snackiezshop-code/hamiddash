@@ -94,10 +94,11 @@ function Header({ period }: { period: Period }) {
 }
 
 function rentFacts(period: Period) {
-  const rooms = period.roomIncomes;
-  const paid = rooms.filter((r) => r.status === "LUNAS" || r.status === "TAHUNAN").length;
+  // Monthly rent only: yearly rooms pay once a year and show up as their own Pemasukan lain line.
+  const rooms = period.roomIncomes.filter((r) => r.status !== "TAHUNAN");
+  const paid = rooms.filter((r) => r.status === "LUNAS").length;
   const owing = rooms.filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK").length;
-  const notPaid = rooms.filter((r) => r.status !== "LUNAS" && r.status !== "TAHUNAN");
+  const notPaid = rooms.filter((r) => r.status !== "LUNAS");
   return { paid, owing, notPaid };
 }
 

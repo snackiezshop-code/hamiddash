@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
-import { daysBetween, dueDateOf, reminderText, shiftMonth, todayJakarta, waLink } from "./format";
+import { annualText, daysBetween, dueDateOf, reminderText, shiftMonth, todayJakarta, waLink } from "./format";
+import { annualStates } from "./annual";
 import { openPromises } from "./promises";
 
 // Days before the due date that a reminder is flagged: 3 days ahead, then on the day itself.
@@ -11,6 +12,7 @@ export const OVERDUE_EVERY = 3;
 const OVERDUE_LOOKBACK_MONTHS = 3;
 
 export type DueReminder = {
+  kind: "monthly" | "annual";
   tenantName: string;
   roomId: string;
   roomNumber: number;
@@ -24,7 +26,12 @@ export type DueReminder = {
   waHref: string | null;
   // Set when the promised date has passed and the rent is still unpaid ("janji lewat").
   lapsedPromise: { id: string; date: Date } | null;
+  // Yearly rent only: the term being paid and whether part of it is already in.
+  annual: { termLabel: string; partial: boolean; paid: number; rent: number } | null;
 };
+
+// Yearly rent alerts 7 days before it's due, on the day, then every 3 days while late.
+export const ANNUAL_LEAD_DAYS = 7;
 
 const ym = (year: number, month: number) => year * 12 + month;
 
@@ -41,7 +48,7 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
   const months = Array.from({ length: OVERDUE_LOOKBACK_MONTHS + 2 }, (_, i) =>
     shiftMonth(curYear, curMonth, i - OVERDUE_LOOKBACK_MONTHS)); // past months … this month, next month
 
-  const [tenants, periods, latest, promises] = await Promise.all([
+  const [tenants, periods, latest, promises, annual] = await Promise.all([
     db.tenant.findMany({ where: { reminderDay: { not: null } }, include: { room: true } }),
     db.cashPeriod.findMany({
       where: { OR: months.map((m) => ({ year: m.year, month: m.month })) },
@@ -49,6 +56,7 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
     }),
     db.cashPeriod.findFirst({ orderBy: [{ year: "desc" }, { month: "desc" }], select: { year: true, month: true } }),
     openPromises(),
+    annualStates(today),
   ]);
   const latestYm = latest ? ym(latest.year, latest.month) : 0;
 
@@ -76,6 +84,7 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
         year: m.year, month: m.month, dueDay: tenant.reminderDay,
       }, today);
       out.push({
+        kind: "monthly", annual: null,
         tenantName: tenant.name, roomId: room.id, roomNumber: room.number, phone: tenant.phone, amount: room.monthlyRent,
         year: m.year, month: m.month, daysUntilDue: days,
         // A lapsed promise alerts through its own reminder, so the rent alert stays quiet (no double alert).
@@ -84,6 +93,21 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
         lapsedPromise: promise ? { id: promise.id, date: promise.date } : null,
       });
     }
+  }
+  for (const a of annual.values()) {
+    const days = a.daysUntilDue;
+    if (days > ANNUAL_LEAD_DAYS) continue;
+    const promise = promises.get(a.roomId);
+    if (promise && daysBetween(today, promise.date) >= 0) continue;
+    const text = annualText({ name: a.tenantName, roomNumber: a.roomNumber, amount: a.remaining, paid: a.paid, partial: a.partial, dueDate: a.dueDate, daysUntilDue: days, termLabel: a.termLabel });
+    out.push({
+      kind: "annual", tenantName: a.tenantName, roomId: a.roomId, roomNumber: a.roomNumber, phone: a.phone, amount: a.remaining,
+      year: a.payTermStart.getUTCFullYear(), month: a.payTermStart.getUTCMonth() + 1, daysUntilDue: days,
+      alertToday: !promise && (days === ANNUAL_LEAD_DAYS || days === 0 || isOverdueAlertDay(-days)),
+      text, waHref: waLink(a.phone, text),
+      lapsedPromise: promise ? { id: promise.id, date: promise.date } : null,
+      annual: { termLabel: a.termLabel, partial: a.partial, paid: a.paid, rent: a.rent },
+    });
   }
   // Most overdue first, then due today, then upcoming.
   return out.sort((a, b) => a.daysUntilDue - b.daysUntilDue || a.roomNumber - b.roomNumber);

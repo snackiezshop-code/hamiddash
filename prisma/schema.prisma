@@ -27,6 +27,7 @@ model Room {
   id          String       @id @default(cuid())
   number      Int          @unique // Kamar 1-16
   monthlyRent Int // Rp per month, room-specific
+  annualRent  Int? // Rp per year, for rooms on status TAHUNAN; the term ends on the tenant's leaseEndDate
   status      RoomStatus   @default(KOSONG)
   tenant      Tenant?
   roomIncomes RoomIncome[]
@@ -87,6 +88,9 @@ model AdditionalIncome {
   description String
   source      String?
   amount      Int
+  // Set on yearly-rent instalments: which room and which term (its end date) the money pays for.
+  annualRoomId  String?
+  annualTermEnd DateTime?
   createdAt   DateTime   @default(now())
 }
 

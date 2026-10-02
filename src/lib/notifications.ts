@@ -30,7 +30,7 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
   const label = latest ? periodLabel(latest.year, latest.month) : "";
   const slug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
 
-  const overdueCount = rent.filter((r) => r.daysUntilDue < 0).length;
+  const overdueCount = rent.filter((r) => r.kind === "monthly" && r.daysUntilDue < 0).length;
   // Rooms with a promise still ahead aren't chased; the promise itself alerts the day before and on the day.
   const promisedAhead = (roomId: string) => { const p = promises.get(roomId); return Boolean(p && p.date >= now); };
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR" && !promisedAhead(r.roomId)) ?? [];
@@ -71,6 +71,14 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
         roomNumber: wa ? undefined : inc.room.number,
       };
     }),
+    // Yearly rent from 7 days before it's due (the renewal, or the rest of a part-paid term).
+    ...rent.filter((r) => r.kind === "annual").map((r) => ({
+      id: `annual-${r.roomId}`, tone: (r.daysUntilDue < 0 ? "blush" : "butter") as Notification["tone"],
+      title: `Sewa tahunan · Kamar ${r.roomNumber} · ${reminderDueLabel(r.daysUntilDue).toLowerCase()}`,
+      detail: `${properName(r.tenantName)} · ${r.annual?.partial ? "sisa " : ""}${rupiah(r.amount)} · ${r.annual?.termLabel ?? ""}`,
+      href: r.waHref ?? `/kamar/${r.roomNumber}`,
+      external: Boolean(r.waHref),
+    })),
     ...unpaid.filter((inc) => !dueTodayIds.has(inc.id)).map((inc) => ({
       id: `unpaid-${inc.id}`, tone: "blush" as const,
       title: `Kamar ${inc.room.number} belum bayar`,

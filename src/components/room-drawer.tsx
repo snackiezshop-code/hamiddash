@@ -4,7 +4,9 @@ import Link from "next/link";
 import { createContext, useContext, useState, type ComponentProps, type ReactNode } from "react";
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { checkoutTenant } from "@/app/actions";
-import { STATUS_LABEL, formatDate, periodLabel, reminderText, rupiah } from "@/lib/format";
+import { STATUS_LABEL, annualText, formatDate, periodLabel, reminderText, rupiah } from "@/lib/format";
+import { dueLabel } from "@/lib/reminder-items";
+import { AnnualPayButton } from "./annual";
 import { Avatar, Chevron, IconBadge, STATUS_PASTEL } from "./kit";
 import { Sheet } from "./kit-client";
 import { ConfirmButton } from "./forms";
@@ -29,7 +31,15 @@ export type DrawerRoom = {
   } | null;
   history: { id: string; year: number; month: number; status: RoomStatus; amount: number }[];
   promise: { id: string; date: Date } | null; // open payment promise ("janji bayar")
+  annual: AnnualInfo | null; // yearly rent (status Tahunan), when its price and term end are filled in
 };
+
+export type AnnualInfo = { rent: number; remaining: number; paid: number; partial: boolean; termLabel: string; termEnd: Date; dueDate: Date; daysUntilDue: number };
+
+// Yearly rent needs attention from 30 days before it's due, or while part of it is still owed.
+export const annualNeedsAttention = (a: AnnualInfo) => a.partial || a.daysUntilDue <= 30;
+// The first day of the term being paid (the day after it was due).
+const termStart = (a: AnnualInfo) => new Date(a.dueDate.getTime() + 24 * 60 * 60 * 1000);
 
 // A room opens as this sheet wherever it's tapped (Rooms list, Overview tiles, search): quick
 // actions here, editing on the full /kamar/[number] page.
@@ -87,7 +97,11 @@ export function RoomRows({ rooms }: { rooms: DrawerRoom[] }) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className={`block truncate font-medium ${r.tenant ? "" : "text-ink-soft"}`}>{r.tenant?.name ?? "Tanpa penghuni"}</span>
-                <span className="num block truncate text-xs text-ink-soft">{r.monthlyRent > 0 ? rupiah(r.monthlyRent) : "Tahunan"}{r.tenant?.reminderDay ? ` · tgl ${r.tenant.reminderDay}` : ""}</span>
+                <span className="num block truncate text-xs text-ink-soft">
+                  {r.status === "TAHUNAN"
+                    ? r.annual ? `${rupiah(r.annual.rent)} / tahun · s/d ${formatDate(r.annual.termEnd)}` : "Tahunan · data belum lengkap"
+                    : `${rupiah(r.monthlyRent)}${r.tenant?.reminderDay ? ` · tgl ${r.tenant.reminderDay}` : ""}`}
+                </span>
               </span>
               <StatusPill status={r.status} />
               <Chevron />
@@ -156,6 +170,30 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
               <PaidButton incomeId={current.id} roomNumber={room.number} />
             </div>
           )}
+          {room.status === "TAHUNAN" && t && (room.annual ? (
+            <div className={`card ${annualNeedsAttention(room.annual) ? (room.annual.daysUntilDue < 0 ? "bg-blush" : "bg-butter") : "bg-mint"}`}>
+              <p className="eyebrow">Sewa tahunan · s/d {formatDate(room.annual.termEnd)}</p>
+              <p className="mt-1.5 text-sm">
+                {room.annual.partial
+                  ? <>Sisa <b className="num font-semibold">{rupiah(room.annual.remaining)}</b> untuk {room.annual.termLabel} · <b>{dueLabel(room.annual.daysUntilDue)}</b></>
+                  : annualNeedsAttention(room.annual)
+                    ? <>Perpanjangan {room.annual.termLabel}, <b className="num font-semibold">{rupiah(room.annual.rent)}</b> · <b>{room.annual.daysUntilDue < 0 ? dueLabel(room.annual.daysUntilDue) : `berakhir ${dueLabel(room.annual.daysUntilDue).toLowerCase()}`}</b></>
+                    : <>Lunas sampai {formatDate(room.annual.termEnd)}. Pengingat perpanjangan mulai 7 hari sebelumnya.</>}
+              </p>
+              {annualNeedsAttention(room.annual) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <WaButton iconOnly phone={t.phone} label={`Kirim pengingat sewa tahunan ke ${t.name}`}
+                    text={annualText({ name: t.name, roomNumber: room.number, amount: room.annual.remaining, paid: room.annual.paid, partial: room.annual.partial, dueDate: room.annual.dueDate, daysUntilDue: room.annual.daysUntilDue, termLabel: room.annual.termLabel })} />
+                  <AnnualPayButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, rent: room.annual.rent, remaining: room.annual.remaining, paid: room.annual.paid, partial: room.annual.partial, termLabel: room.annual.termLabel }} />
+                  <PromiseButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, phone: t.phone,
+                    year: termStart(room.annual).getUTCFullYear(), month: termStart(room.annual).getUTCMonth() + 1, current: room.promise }} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="card bg-butter text-sm">Kamar tahunan: isi <b>sewa tahunan</b> dan <b>kontrak sampai</b> di halaman edit (ikon pensil) supaya tagihannya bisa diingatkan.</p>
+          ))}
+
           {owes && current && t && (
             <div className="-mt-1 flex items-center justify-between gap-3">
               <p className="text-sm text-ink-soft">
