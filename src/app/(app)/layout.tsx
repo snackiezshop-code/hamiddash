@@ -6,6 +6,7 @@ import { AppHeader, PageTabs } from "@/components/nav";
 import { dueItems, dueReminders } from "@/lib/reminders";
 import { getNotifications } from "@/lib/notifications";
 import { Toaster } from "@/components/toast";
+import { HomeOnOpen } from "@/components/home-on-open";
 import { QuickAddProvider, type QuickAddData } from "@/components/quick-add";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
@@ -53,6 +54,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <PageTabs cashHref={cashHref} />
       </div>
       <Toaster />
+      <HomeOnOpen />
     </QuickAddProvider>
   );
 }
