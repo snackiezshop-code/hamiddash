@@ -30,7 +30,12 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return isIos && !standalone ? "needs-install" : "unsupported";
     if (Notification.permission === "denied") return "denied";
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
-    return (await reg.pushManager.getSubscription()) ? "on" : "off";
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return "off";
+    // The phone still has its subscription: save it again in case the server lost it (a deleted
+    // row, a restored database), otherwise the switch says "on" while nothing can be sent.
+    void subscribePush(JSON.parse(JSON.stringify(sub))).catch(() => {});
+    return "on";
   }
 
   function check() {
@@ -43,18 +48,34 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
 
   async function enable() {
     if (!publicKey) return;
+    // Ask first, straight from the tap: iPhone only shows the permission prompt while the tap is
+    // still "fresh", and drops it if other awaits run before it.
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      setState(permission === "denied" ? "denied" : "off");
+      setNote(permission === "denied" ? null : "Izin notifikasi belum diberikan. Ketuk lagi lalu pilih Izinkan.");
+      return;
+    }
     setBusy(true);
     setNote(null);
+    let step = "mendaftarkan perangkat";
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
+      const reg = (await navigator.serviceWorker.getRegistration("/")) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }));
+      await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription())
+        ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) }));
+      step = "menyimpan ke server";
       await subscribePush(JSON.parse(JSON.stringify(sub)));
       setState("on");
-      await sendTestPush();
-      setNote("Peringatan uji coba sudah dikirim ke perangkat ini.");
-    } catch {
+      step = "mengirim uji coba";
+      const res = await sendTestPush();
+      setNote(res.sent > 0
+        ? "Peringatan uji coba sudah dikirim. Kalau tidak muncul dalam 1 menit, kunci HP sebentar lalu cek layar kunci."
+        : `Perangkat tersimpan, tapi uji coba gagal terkirim${res.errors.length ? ` (${res.errors.join(", ")})` : ""}.`);
+    } catch (err) {
       setState(Notification.permission === "denied" ? "denied" : "off");
-      setNote("Gagal menyalakan peringatan. Coba lagi.");
+      const why = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      setNote(`Gagal saat ${step}. ${why}`);
     } finally {
       setBusy(false);
     }

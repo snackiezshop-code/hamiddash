@@ -19,15 +19,19 @@ export async function sendPushToAll(payload: PushPayload) {
 
   const subs = await db.pushSubscription.findMany();
   let sent = 0;
+  const errors: string[] = [];
   await Promise.all(subs.map(async (s) => {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload));
+      // urgency high + a TTL: Apple holds low-urgency pushes until the phone wakes on its own.
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload),
+        { TTL: 24 * 60 * 60, urgency: "high" });
       sent++;
     } catch (err) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) await db.pushSubscription.delete({ where: { id: s.id } });
-      else console.error("[hamid] push failed", status, err);
+      const e = err as { statusCode?: number; body?: string };
+      errors.push(`${new URL(s.endpoint).host} ${e.statusCode ?? "?"}${e.body ? ` ${e.body.slice(0, 80)}` : ""}`);
+      if (e.statusCode === 404 || e.statusCode === 410) await db.pushSubscription.delete({ where: { id: s.id } });
+      else console.error("[hamid] push failed", e.statusCode, err);
     }
   }));
-  return { devices: subs.length, sent };
+  return { devices: subs.length, sent, errors };
 }
