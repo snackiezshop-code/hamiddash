@@ -4,17 +4,25 @@ import { db } from "./db";
 
 export type PushPayload = { title: string; body: string; url: string };
 
+// Env values pasted into a dashboard sometimes keep their quote marks or a stray space; web-push
+// rejects those, so they're cleaned up before use.
+const envValue = (name: string) => process.env[name]?.trim().replace(/^["']|["']$/g, "").trim() || undefined;
+
+export function vapidPublicKey() {
+  return envValue("VAPID_PUBLIC_KEY") ?? null;
+}
+
 export function pushConfigured() {
-  return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+  return Boolean(envValue("VAPID_PUBLIC_KEY") && envValue("VAPID_PRIVATE_KEY"));
 }
 
 // Sends to every saved device; subscriptions the push service reports as gone (404/410) are dropped.
 export async function sendPushToAll(payload: PushPayload) {
   if (!pushConfigured()) throw new Error("VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set");
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:admin@hamidkost.local",
-    process.env.VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
+    envValue("VAPID_SUBJECT") ?? "mailto:admin@hamidkost.local",
+    envValue("VAPID_PUBLIC_KEY")!,
+    envValue("VAPID_PRIVATE_KEY")!,
   );
 
   const subs = await db.pushSubscription.findMany();

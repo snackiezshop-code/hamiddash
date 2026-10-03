@@ -6,6 +6,7 @@ import { PromiseButton } from "@/components/promise";
 import { Empty, PageHeader, Section } from "@/components/ui";
 import { SegmentedLinks } from "@/components/kit-client";
 import { PushToggle } from "@/components/push-toggle";
+import { vapidPublicKey } from "@/lib/push";
 import { QuickAddButton } from "@/components/quick-add";
 import { ReminderList, type ReminderItem } from "@/components/reminder-list";
 import { IconPlus, IconWhatsApp } from "@/components/icons";
@@ -66,7 +67,7 @@ export default async function RemindersPage({ searchParams }: PageProps<"/pengin
         </Section>
 
         <Section title="Peringatan harian">
-          <PushToggle publicKey={process.env.VAPID_PUBLIC_KEY ?? null} />
+          <PushToggle publicKey={vapidPublicKey()} />
         </Section>
       </div>
     </>

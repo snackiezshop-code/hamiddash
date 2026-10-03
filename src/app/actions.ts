@@ -528,14 +528,19 @@ export async function unsubscribePush(endpoint: string) {
   await db.pushSubscription.deleteMany({ where: { endpoint } });
 }
 
-export async function sendTestPush() {
+export async function sendTestPush(): Promise<{ devices: number; sent: number; errors: string[] }> {
   await requireAdmin();
-  const due = await dueReminders();
-  return sendPushToAll({
-    title: "Peringatan pengingat menyala",
-    body: due.length
-      ? `${due.length} pengingat jatuh tempo sekarang. Ketuk untuk membukanya.`
-      : "Kamu akan menerima peringatan di sini jam 09.00 saat sewa atau pengingat segera jatuh tempo, jatuh tempo hari ini, atau telat.",
-    url: "/pengingat",
-  });
+  try {
+    const due = await dueReminders();
+    return await sendPushToAll({
+      title: "Peringatan pengingat menyala",
+      body: due.length
+        ? `${due.length} pengingat jatuh tempo sekarang. Ketuk untuk membukanya.`
+        : "Kamu akan menerima peringatan di sini jam 09.00 saat sewa atau pengingat segera jatuh tempo, jatuh tempo hari ini, atau telat.",
+      url: "/pengingat",
+    });
+  } catch (err) {
+    // Production hides thrown server errors, so the reason goes back as data (e.g. a malformed VAPID key).
+    return { devices: 0, sent: 0, errors: [err instanceof Error ? err.message : String(err)] };
+  }
 }
