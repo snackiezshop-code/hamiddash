@@ -1,19 +1,32 @@
 import "server-only";
+import path from "node:path";
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ExpenseCategory, RoomStatus } from "@/generated/prisma/enums";
 import type { getPeriod, summarize } from "./cashbook";
-import { CATEGORY_LABEL, todayJakarta } from "./format";
+import { CATEGORY_LABEL, shiftMonth, todayJakarta } from "./format";
 
+// Monthly report for the family (it gets forwarded to the heirs' group), in Indonesian. The layout
+// follows the original "Laporan Bulanan Kost Mujair 12" sheet: totals on top, every room's rent on
+// the left, expenses and the cash-flow summary on the right. The look follows the app (Panel):
+// outlined boxes with a hard shadow edge, navy headers, orange for what's unpaid, Space Grotesk.
+// Tenants appear by room number only, never by name.
+
+const FONT_DIR = path.join(process.cwd(), "src/assets/fonts");
+Font.register({
+  family: "Space Grotesk",
+  fonts: [
+    { src: path.join(FONT_DIR, "SpaceGrotesk-Regular.woff"), fontWeight: 400 },
+    { src: path.join(FONT_DIR, "SpaceGrotesk-SemiBold.woff"), fontWeight: 600 },
+  ],
+});
 Font.registerHyphenationCallback((word) => [word]);
 
-// Monthly report for the family (it gets forwarded to the heirs' group), in Indonesian.
-// Tenants appear by room number only, never by name.
 const BULAN = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 const STATUS_ID: Record<RoomStatus, string> = {
-  LUNAS: "Lunas", TUNDA_BAYAR: "Belum bayar", KOSONG: "Kosong", RUSAK: "Rusak", TAHUNAN: "Bayar tahunan",
+  LUNAS: "Lunas", TUNDA_BAYAR: "Belum bayar", KOSONG: "Kosong", RUSAK: "Rusak", TAHUNAN: "Tahunan",
 };
 const KATEGORI_ID: Record<ExpenseCategory, string> = {
   LISTRIK: "Listrik", PDAM: "PDAM", CLEANING_SERVICE: "Cleaning service", KEBERSIHAN: "Kebersihan",
@@ -24,163 +37,240 @@ const KATEGORI_ID: Record<ExpenseCategory, string> = {
 export const bulanLabel = (year: number, month: number) => `${BULAN[month - 1]} ${year}`;
 const tanggal = (d: Date) => `${d.getUTCDate()} ${BULAN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 const rp = (n: number) => `${n < 0 ? "-" : ""}Rp${Math.abs(n).toLocaleString("id-ID")}`;
+const rpOrDash = (n: number) => (n ? rp(n) : "-");
 type ExpenseLike = { category: ExpenseCategory; categoryLabel: string | null; description: string };
 const kategori = (e: Omit<ExpenseLike, "description">) =>
   e.category === "LAINNYA" && e.categoryLabel ? e.categoryLabel : KATEGORI_ID[e.category];
-// What the money was for. A description that only repeats the category ("Listrik" under Listrik,
-// or "-") falls back to the category name, so every row says something.
+// What the money was for; empty when the description only repeats the category ("Listrik" under Listrik).
 const keterangan = (e: ExpenseLike) => {
   const d = e.description.trim();
-  return ["", "-", kategori(e).toLowerCase(), CATEGORY_LABEL[e.category].toLowerCase()].includes(d.toLowerCase()) ? kategori(e) : d;
+  return ["", "-", kategori(e).toLowerCase(), CATEGORY_LABEL[e.category].toLowerCase()].includes(d.toLowerCase()) ? "" : d;
 };
 
-// The app's palette: ink on white, terracotta for the one number that matters (the closing balance).
+// The app's Panel palette.
 const C = {
-  ink: "#211D19",
-  soft: "#6B635A",
-  line: "#E8E2D9",
-  cream: "#F7F4F0",
-  terra: "#A0533D",
-  mintDeep: "#2F6446",
-  blushDeep: "#8E3A26",
+  paper: "#FAF8F3",
+  cream: "#F1EDE5",
+  ink: "#14171C",
+  soft: "#55524B",
+  line: "#CBC5BA",
+  navy: "#1C2A3A",
+  orange: "#D9390F",
+  orangeText: "#B8300C",
+  blush: "#F7DED3",
+  mint: "#DDE4EC",
 };
 
 const s = StyleSheet.create({
-  page: { paddingTop: 40, paddingBottom: 56, paddingHorizontal: 44, fontSize: 10, fontFamily: "Helvetica", color: C.ink, lineHeight: 1.35 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 1, borderColor: C.line, paddingBottom: 10 },
-  title: { fontFamily: "Times-Bold", fontSize: 22, lineHeight: 1.15 },
-  sub: { color: C.soft, fontSize: 10, marginTop: 4 },
-  h2: { fontFamily: "Times-Bold", fontSize: 14, marginBottom: 6 },
-  section: { marginTop: 22 },
-  muted: { color: C.soft },
-  small: { fontSize: 8.5, color: C.soft },
-  bold: { fontFamily: "Helvetica-Bold" },
+  page: { paddingTop: 30, paddingBottom: 44, paddingHorizontal: 28, fontSize: 7.6, fontFamily: "Space Grotesk", color: C.ink, backgroundColor: C.paper, lineHeight: 1.3 },
+  eyebrow: { fontSize: 6.6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.soft },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 1.5, borderColor: C.ink, paddingBottom: 9 },
+  title: { fontSize: 20, fontWeight: 600, letterSpacing: -0.4, marginTop: 4, lineHeight: 1.2 },
+  // A box with the app's hard shadow: a thicker right and bottom edge.
+  box: { borderWidth: 1.2, borderRightWidth: 3, borderBottomWidth: 3, borderColor: C.ink, borderRadius: 2.5, backgroundColor: C.paper },
+  kpiRow: { flexDirection: "row", gap: 7, marginTop: 12 },
+  kpi: { flex: 1, paddingVertical: 7, paddingHorizontal: 8 },
+  kpiValue: { fontSize: 12.5, fontWeight: 600, letterSpacing: -0.3, marginTop: 4 },
+  cols: { flexDirection: "row", gap: 9, marginTop: 12, alignItems: "flex-start" },
+  section: { marginBottom: 10 },
+  sectionTitle: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, paddingHorizontal: 6, borderBottomWidth: 1.2, borderColor: C.ink },
+  headRow: { flexDirection: "row", backgroundColor: C.navy, color: "#FFFFFF" },
+  head: { fontSize: 6.4, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", paddingVertical: 4, paddingHorizontal: 4 },
+  row: { flexDirection: "row", alignItems: "center", borderBottomWidth: 0.5, borderColor: C.line, minHeight: 14.5 },
+  cell: { paddingVertical: 2.6, paddingHorizontal: 4 },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, paddingHorizontal: 6, borderTopWidth: 1.2, borderColor: C.ink, fontWeight: 600 },
   right: { textAlign: "right" },
-  // Tables
-  th: { flexDirection: "row", paddingVertical: 5, paddingHorizontal: 6, backgroundColor: C.cream, fontSize: 8.5, color: C.soft, fontFamily: "Helvetica-Bold" },
-  tr: { flexDirection: "row", paddingVertical: 5, paddingHorizontal: 6, borderBottomWidth: 0.5, borderColor: C.line },
-  trTotal: { flexDirection: "row", paddingVertical: 6, paddingHorizontal: 6, fontFamily: "Helvetica-Bold", borderTopWidth: 1, borderColor: C.ink },
-  footer: { position: "absolute", bottom: 24, left: 44, right: 44, flexDirection: "row", justifyContent: "space-between", fontSize: 8, color: C.soft },
+  center: { textAlign: "center" },
+  bold: { fontWeight: 600 },
+  muted: { color: C.soft },
+  chip: { fontSize: 6.2, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", borderWidth: 0.9, borderRadius: 1.5, paddingTop: 1.6, paddingBottom: 0.8, paddingHorizontal: 3, lineHeight: 1, alignSelf: "center" },
+  sumRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, paddingHorizontal: 6, borderBottomWidth: 0.5, borderColor: C.line },
+  footer: { position: "absolute", bottom: 18, left: 28, right: 28, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 0.5, borderColor: C.line, paddingTop: 5 },
+  footerText: { fontSize: 6.6, color: C.soft },
 });
 
 type Period = NonNullable<Awaited<ReturnType<typeof getPeriod>>>;
 type Summary = ReturnType<typeof summarize>;
 type Props = { period: Period; summary: Summary };
 
-export function MonthlyReport({ period, summary }: Props) {
-  const label = bulanLabel(period.year, period.month);
-  return (
-    <Document title={`Laporan Kas Kost Mujair 12 - ${label}`} author="Hamid">
-      <Page size="A4" style={s.page}>
-        <BukuKas period={period} summary={summary} />
-        <View style={s.footer} fixed>
-          <Text>Kost Mujair 12 · Laporan kas {label} · dibuat {tanggal(todayJakarta())}</Text>
-          <Text render={({ pageNumber, totalPages }) => `Halaman ${pageNumber} dari ${totalPages}`} />
-        </View>
-      </Page>
-    </Document>
-  );
+function chipStyle(status: RoomStatus) {
+  if (status === "LUNAS") return { color: C.navy, borderColor: C.navy, backgroundColor: C.mint };
+  if (status === "TUNDA_BAYAR") return { color: C.orangeText, borderColor: C.orangeText, backgroundColor: C.blush };
+  if (status === "TAHUNAN") return { color: C.navy, borderColor: C.navy, backgroundColor: C.paper };
+  return { color: C.soft, borderColor: C.soft, backgroundColor: C.cream };
 }
 
-function Header({ period }: { period: Period }) {
+function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
-    <View style={s.header}>
-      <View>
-        <Text style={s.title}>Kost Mujair 12</Text>
-        <Text style={s.sub}>Laporan kas bulan {bulanLabel(period.year, period.month)}</Text>
-      </View>
+    <View style={s.sectionTitle}>
+      <Text style={s.eyebrow}>{title}</Text>
+      {note ? <Text style={[s.eyebrow, { color: C.ink }]}>{note}</Text> : null}
     </View>
   );
 }
 
-function rentFacts(period: Period) {
-  // Monthly rent only: yearly rooms pay once a year and show up as their own Pemasukan lain line.
-  const rooms = period.roomIncomes.filter((r) => r.status !== "TAHUNAN");
-  const paid = rooms.filter((r) => r.status === "LUNAS").length;
-  const owing = rooms.filter((r) => r.status !== "KOSONG" && r.status !== "RUSAK").length;
-  const notPaid = rooms.filter((r) => r.status !== "LUNAS");
-  return { paid, owing, notPaid };
-}
+export function MonthlyReport({ period, summary }: Props) {
+  const bulan = BULAN[period.month - 1];
+  const prev = shiftMonth(period.year, period.month, -1);
+  const rooms = period.roomIncomes;
+  const monthly = rooms.filter((r) => r.status !== "TAHUNAN" && r.status !== "KOSONG" && r.status !== "RUSAK");
+  const paid = monthly.filter((r) => r.status === "LUNAS").length;
 
-// Rooms that brought in no rent, in one line: "Belum bayar: kamar 3, 7 · Kosong: kamar 4".
-function notPaidLine(period: Period) {
-  const { notPaid } = rentFacts(period);
-  const byStatus = new Map<string, number[]>();
-  for (const r of notPaid) byStatus.set(STATUS_ID[r.status], [...(byStatus.get(STATUS_ID[r.status]) ?? []), r.room.number]);
-  return [...byStatus].map(([st, nums]) => `${st}: kamar ${nums.join(", ")}`).join(" · ");
-}
-
-// One passbook-style table: saldo awal, rent and other income, then every expense, with the
-// balance after each row on the right and saldo akhir at the bottom.
-function BukuKas({ period, summary }: Props) {
-  const { paid, owing } = rentFacts(period);
-  type Row = { label: string; note?: string; masuk?: number; keluar?: number };
-  const rows: Row[] = [
-    { label: `Sewa kamar (${paid} dari ${owing} kamar lunas)`, note: notPaidLine(period) || undefined, masuk: summary.roomTotal },
-    ...period.additionalIncomes.map((a) => ({ label: `${a.description}${a.source ? ` (${a.source})` : ""}`, masuk: a.amount })),
-    ...period.expenses.map((e) => ({ label: keterangan(e), note: keterangan(e) !== kategori(e) ? kategori(e) : undefined, keluar: e.amount })),
+  const kpis = [
+    { label: "Saldo kas awal", value: summary.openingBalance },
+    { label: `Pemasukan ${bulan}`, value: summary.incomeTotal },
+    { label: `Pengeluaran ${bulan}`, value: summary.expenseTotal },
   ];
-  let saldo = summary.openingBalance;
-  const W = { no: 22, amt: 78, saldo: 86 };
+
+  const summaryRows: [string, number, boolean][] = [
+    ["Total sewa kamar", summary.roomTotal, false],
+    ["Pemasukan tambahan", summary.additionalTotal, false],
+    [`Total pemasukan ${bulan}`, summary.incomeTotal, true],
+    [`Total pengeluaran ${bulan}`, -summary.expenseTotal, false],
+    [`Arus kas bersih ${bulan}`, summary.netFlow, true],
+    ["Saldo kas awal", summary.openingBalance, false],
+  ];
 
   return (
-    <>
-      <Header period={period} />
-      <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-        {([
-          ["Uang masuk", summary.incomeTotal, C.mintDeep],
-          ["Uang keluar", summary.expenseTotal, C.blushDeep],
-          [summary.netFlow >= 0 ? "Kas bertambah" : "Kas berkurang", Math.abs(summary.netFlow), C.ink],
-        ] as const).map(([k, v, color]) => (
-          <View key={k} style={{ flex: 1, borderWidth: 0.5, borderColor: C.line, borderRadius: 6, padding: 8 }}>
-            <Text style={s.small}>{k}</Text>
-            <Text style={[s.bold, { fontSize: 12, marginTop: 2, color }]}>{rp(v)}</Text>
+    <Document title={`Laporan Bulanan Kost Mujair 12 - ${bulan.toUpperCase()} ${period.year}`} author="HamidKost">
+      <Page size="A4" style={s.page}>
+        <View style={s.header}>
+          <View>
+            <Text style={s.eyebrow}>Laporan arus kas · Kost Mujair 12</Text>
+            <Text style={s.title}>{bulan} {period.year}</Text>
           </View>
-        ))}
-      </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1 }}>HAMIDKOST</Text>
+            <Text style={[s.muted, { fontSize: 6.8, marginTop: 2 }]}>Dibuat {tanggal(todayJakarta())}</Text>
+          </View>
+        </View>
 
-      <View style={s.section}>
-        <Text style={s.h2}>Buku kas {bulanLabel(period.year, period.month)}</Text>
-        <View style={s.th} fixed>
-          <Text style={{ width: W.no }}>No</Text>
-          <Text style={{ flex: 1 }}>Keterangan</Text>
-          <Text style={[s.right, { width: W.amt }]}>Masuk</Text>
-          <Text style={[s.right, { width: W.amt }]}>Keluar</Text>
-          <Text style={[s.right, { width: W.saldo }]}>Saldo</Text>
-        </View>
-        <View style={[s.tr, { backgroundColor: C.cream }]}>
-          <Text style={{ width: W.no }} />
-          <Text style={[s.bold, { flex: 1 }]}>Saldo awal</Text>
-          <Text style={{ width: W.amt * 2 }} />
-          <Text style={[s.right, s.bold, { width: W.saldo }]}>{rp(saldo)}</Text>
-        </View>
-        {rows.map((r, i) => {
-          saldo += (r.masuk ?? 0) - (r.keluar ?? 0);
-          return (
-            <View key={i} style={s.tr} wrap={false}>
-              <Text style={[s.muted, { width: W.no }]}>{i + 1}</Text>
-              <View style={{ flex: 1, paddingRight: 6 }}>
-                <Text>{r.label}</Text>
-                {r.note ? <Text style={s.small}>{r.note}</Text> : null}
-              </View>
-              <Text style={[s.right, { width: W.amt, color: C.mintDeep }]}>{r.masuk ? rp(r.masuk) : ""}</Text>
-              <Text style={[s.right, { width: W.amt, color: C.blushDeep }]}>{r.keluar ? rp(r.keluar) : ""}</Text>
-              <Text style={[s.right, s.muted, { width: W.saldo }]}>{rp(saldo)}</Text>
+        <View style={s.kpiRow}>
+          {kpis.map((k) => (
+            <View key={k.label} style={[s.box, s.kpi]}>
+              <Text style={s.eyebrow}>{k.label}</Text>
+              <Text style={s.kpiValue}>{rp(k.value)}</Text>
             </View>
-          );
-        })}
-        <View style={s.trTotal}>
-          <Text style={{ width: W.no }} />
-          <Text style={{ flex: 1 }}>Jumlah</Text>
-          <Text style={[s.right, { width: W.amt, color: C.mintDeep }]}>{rp(summary.incomeTotal)}</Text>
-          <Text style={[s.right, { width: W.amt, color: C.blushDeep }]}>{rp(summary.expenseTotal)}</Text>
-          <Text style={{ width: W.saldo }} />
+          ))}
+          <View style={[s.box, s.kpi, { backgroundColor: C.navy }]}>
+            <Text style={[s.eyebrow, { color: "#FFFFFF" }]}>Saldo kas akhir</Text>
+            <Text style={[s.kpiValue, { color: "#FFFFFF" }]}>{rp(summary.closingBalance)}</Text>
+          </View>
         </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: C.terra, borderRadius: 6 }}>
-          <Text style={[s.bold, { color: "#FFFFFF", fontSize: 11 }]}>Saldo akhir</Text>
-          <Text style={[s.bold, { color: "#FFFFFF", fontSize: 13 }]}>{rp(summary.closingBalance)}</Text>
+
+        <View style={s.cols}>
+          {/* Left: every room, then other income with the opening balance. */}
+          <View style={{ flex: 1 }}>
+            <View style={[s.box, s.section]}>
+              <SectionTitle title="Pemasukan sewa kamar" note={`${paid}/${monthly.length} lunas`} />
+              <View style={s.headRow}>
+                <Text style={[s.head, s.center, { width: 18 }]}>No</Text>
+                <Text style={[s.head, { flex: 1 }]}>Kamar</Text>
+                <Text style={[s.head, s.center, { width: 58 }]}>Status</Text>
+                <Text style={[s.head, s.right, { width: 60 }]}>Harga sewa</Text>
+                <Text style={[s.head, s.right, { width: 60 }]}>Diterima</Text>
+              </View>
+              {rooms.map((r, i) => {
+                const yearly = r.status === "TAHUNAN";
+                const price = yearly ? r.room.annualRent ?? 0 : r.room.monthlyRent;
+                return (
+                  <View key={r.id} style={s.row} wrap={false}>
+                    <Text style={[s.cell, s.center, s.muted, { width: 18 }]}>{i + 1}</Text>
+                    <Text style={[s.cell, { flex: 1 }]}>Kamar {r.room.number}</Text>
+                    <View style={{ width: 58 }}><Text style={[s.chip, chipStyle(r.status)]}>{STATUS_ID[r.status]}</Text></View>
+                    <Text style={[s.cell, s.right, s.muted, { width: 60 }]}>{price ? `${rp(price)}${yearly ? "/th" : ""}` : "-"}</Text>
+                    <Text style={[s.cell, s.right, { width: 60 }, r.status === "TUNDA_BAYAR" ? { color: C.orangeText } : {}]}>
+                      {yearly ? "-" : rpOrDash(r.amount)}
+                    </Text>
+                  </View>
+                );
+              })}
+              {rooms.some((r) => r.status === "TAHUNAN") && (
+                <Text style={[s.cell, s.muted, { fontSize: 6.6, paddingHorizontal: 6 }]}>
+                  Kamar tahunan dibayar sekali setahun; pembayarannya tercatat di Pemasukan tambahan pada bulan dibayar.
+                </Text>
+              )}
+              <View style={s.totalRow}>
+                <Text>Total sewa kamar</Text>
+                <Text>{rp(summary.roomTotal)}</Text>
+              </View>
+            </View>
+
+            <View style={[s.box, s.section]}>
+              <SectionTitle title="Pemasukan tambahan & saldo awal" />
+              <View style={s.headRow}>
+                <Text style={[s.head, s.center, { width: 18 }]}>No</Text>
+                <Text style={[s.head, { flex: 1 }]}>Keterangan</Text>
+                <Text style={[s.head, s.right, { width: 66 }]}>Nominal</Text>
+              </View>
+              <View style={s.row} wrap={false}>
+                <Text style={[s.cell, s.center, s.muted, { width: 18 }]}>—</Text>
+                <Text style={[s.cell, s.bold, { flex: 1 }]}>Saldo kas awal (saldo akhir {bulanLabel(prev.year, prev.month)})</Text>
+                <Text style={[s.cell, s.right, s.bold, { width: 66 }]}>{rp(summary.openingBalance)}</Text>
+              </View>
+              {period.additionalIncomes.length === 0 ? (
+                <View style={s.row}><Text style={[s.cell, s.muted]}>Tidak ada pemasukan tambahan.</Text></View>
+              ) : period.additionalIncomes.map((a, i) => (
+                <View key={a.id} style={s.row} wrap={false}>
+                  <Text style={[s.cell, s.center, s.muted, { width: 18 }]}>{i + 1}</Text>
+                  <Text style={[s.cell, { flex: 1 }]}>{a.description}{a.source ? ` (${a.source})` : ""}</Text>
+                  <Text style={[s.cell, s.right, { width: 66 }]}>{rp(a.amount)}</Text>
+                </View>
+              ))}
+              <View style={s.totalRow}>
+                <Text>Total pemasukan tambahan</Text>
+                <Text>{rp(summary.additionalTotal)}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Right: expenses, then the cash-flow summary. */}
+          <View style={{ flex: 1.08 }}>
+            <View style={[s.box, s.section]}>
+              <SectionTitle title="Pengeluaran operasional" note={`${period.expenses.length} transaksi`} />
+              <View style={s.headRow}>
+                <Text style={[s.head, s.center, { width: 18 }]}>No</Text>
+                <Text style={[s.head, { width: 74 }]}>Kategori</Text>
+                <Text style={[s.head, { flex: 1 }]}>Keterangan</Text>
+                <Text style={[s.head, s.right, { width: 62 }]}>Nominal</Text>
+              </View>
+              {period.expenses.length === 0 ? (
+                <View style={s.row}><Text style={[s.cell, s.muted]}>Tidak ada pengeluaran.</Text></View>
+              ) : period.expenses.map((e, i) => (
+                <View key={e.id} style={s.row} wrap={false}>
+                  <Text style={[s.cell, s.center, s.muted, { width: 18 }]}>{i + 1}</Text>
+                  <Text style={[s.cell, { width: 74 }]}>{kategori(e)}</Text>
+                  <Text style={[s.cell, s.muted, { flex: 1 }]}>{keterangan(e)}</Text>
+                  <Text style={[s.cell, s.right, { width: 62 }]}>{rp(e.amount)}</Text>
+                </View>
+              ))}
+              <View style={s.totalRow}>
+                <Text>Total pengeluaran</Text>
+                <Text>{rp(summary.expenseTotal)}</Text>
+              </View>
+            </View>
+
+            <View style={[s.box, s.section]}>
+              <SectionTitle title="Ringkasan arus kas" />
+              {summaryRows.map(([label, value, strong]) => (
+                <View key={label} style={s.sumRow}>
+                  <Text style={strong ? s.bold : {}}>{label}</Text>
+                  <Text style={[s.bold, value < 0 ? { color: C.orangeText } : {}]}>{rp(value)}</Text>
+                </View>
+              ))}
+              <View style={[s.sumRow, { backgroundColor: C.navy, color: "#FFFFFF", borderBottomWidth: 0, paddingVertical: 6 }]}>
+                <Text style={s.bold}>Saldo kas akhir</Text>
+                <Text style={[s.bold, { fontSize: 9 }]}>{rp(summary.closingBalance)}</Text>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
-    </>
+
+        <View style={s.footer}>
+          <Text style={s.footerText}>HamidKost · Laporan bulanan Kost Mujair 12 · {bulan} {period.year}</Text>
+          <Text style={s.footerText}>Dibuat dari aplikasi HamidKost</Text>
+        </View>
+      </Page>
+    </Document>
   );
 }
