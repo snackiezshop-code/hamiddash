@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { ensureCurrentPeriod, getPeriod, summarize } from "@/lib/cashbook";
 import {
   STATUS_LABEL, STATUS_OPTIONS, STATUS_TONE, TONE_CLASS,
-  isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, properName, reminderText, rupiah, shiftMonth,
+  isFuturePeriod, parsePeriodSlug, periodLabel, periodSlug, properName, reminderText, rupiah, shiftMonth, thanksText,
 } from "@/lib/format";
 import {
   addAdditionalIncome, deleteAdditionalIncome, startPeriod, updateRoomIncome,
@@ -208,7 +208,11 @@ export default async function CashPeriodPage({ params, searchParams }: PageProps
                       </Link>
                       {inc.status === "TUNDA_BAYAR" && (
                         <WaButton iconOnly phone={tenant?.phone} label={`Kirim pengingat WhatsApp ke ${name ?? "penghuni"}`}
-                          text={reminderText({ name: tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year, month, dueDay: tenant?.reminderDay ?? null })} />
+                          text={reminderText({ name: tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, paid: inc.amount, year, month, dueDay: tenant?.reminderDay ?? null })} />
+                      )}
+                      {inc.status === "LUNAS" && tenant && (
+                        <WaButton iconOnly phone={tenant.phone} label={`Kirim terima kasih WhatsApp ke ${name}`}
+                          text={thanksText({ name: tenant.name, roomNumber: inc.room.number, year, month, amount: inc.amount })} />
                       )}
                     </div>
                     <div className="flex items-center gap-2">

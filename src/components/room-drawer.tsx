@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createContext, useContext, useState, type ComponentProps, type ReactNode } from "react";
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { checkoutTenant } from "@/app/actions";
-import { STATUS_LABEL, annualText, formatDate, periodLabel, reminderText, rupiah } from "@/lib/format";
+import { STATUS_LABEL, annualText, formatDate, periodLabel, reminderText, rupiah, thanksText } from "@/lib/format";
 import { dueLabel } from "@/lib/reminder-items";
 import { AnnualPayButton } from "./annual";
 import { Avatar, Chevron, IconBadge, STATUS_PASTEL } from "./kit";
@@ -12,6 +12,7 @@ import { Sheet } from "./kit-client";
 import { ConfirmButton } from "./forms";
 import { IconBed, IconEdit } from "./icons";
 import { PaidButton } from "./paid-button";
+import { PartPayButton } from "./part-pay";
 import { PromiseButton } from "./promise";
 import { useQuickAdd } from "./quick-add";
 import { StatusPill, WaButton } from "./ui";
@@ -30,7 +31,7 @@ export type DrawerRoom = {
     notes: string | null;
   } | null;
   history: { id: string; year: number; month: number; status: RoomStatus; amount: number }[];
-  promise: { id: string; date: Date } | null; // open payment promise ("janji bayar")
+  promise: { id: string; date: Date; text: string | null } | null; // open payment promise ("janji bayar") and its WhatsApp reminder
   annual: AnnualInfo | null; // yearly rent (status Tahunan), when its price and term end are filled in
 };
 
@@ -162,11 +163,12 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
           {owes && current && (
             <div className="card flex items-center gap-3 bg-blush">
               <div className="min-w-0 flex-1">
-                <p className="eyebrow text-blush-deep">Belum bayar · {periodLabel(current.year, current.month)}</p>
-                <p className="num mt-1 text-lg font-medium">{rupiah(room.monthlyRent)}</p>
+                <p className="eyebrow text-blush-deep">{current.amount > 0 ? "Sisa bayar" : "Belum bayar"} · {periodLabel(current.year, current.month)}</p>
+                <p className="num mt-1 text-lg font-medium">{rupiah(Math.max(0, room.monthlyRent - current.amount))}</p>
+                {current.amount > 0 && <p className="num text-xs text-blush-deep">Sudah dibayar {rupiah(current.amount)} dari {rupiah(room.monthlyRent)}</p>}
               </div>
-              {t && <WaButton iconOnly phone={t.phone} label={`Kirim pengingat WhatsApp ke ${t.name}`}
-                text={reminderText({ name: t.name, roomNumber: room.number, amount: room.monthlyRent, year: current.year, month: current.month, dueDay: t.reminderDay })} />}
+              {t && <WaButton iconOnly phone={t.phone} label={`Kirim ${room.promise ? "pengingat janji bayar" : "pengingat"} WhatsApp ke ${t.name}`}
+                text={room.promise?.text ?? reminderText({ name: t.name, roomNumber: room.number, amount: room.monthlyRent, paid: current.amount, year: current.year, month: current.month, dueDay: t.reminderDay })} />}
               <PaidButton incomeId={current.id} roomNumber={room.number} />
             </div>
           )}
@@ -182,8 +184,8 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
               </p>
               {annualNeedsAttention(room.annual) && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <WaButton iconOnly phone={t.phone} label={`Kirim pengingat sewa tahunan ke ${t.name}`}
-                    text={annualText({ name: t.name, roomNumber: room.number, amount: room.annual.remaining, paid: room.annual.paid, partial: room.annual.partial, dueDate: room.annual.dueDate, daysUntilDue: room.annual.daysUntilDue, termLabel: room.annual.termLabel })} />
+                  <WaButton iconOnly phone={t.phone} label={`Kirim ${room.promise ? "pengingat janji bayar" : "pengingat sewa tahunan"} ke ${t.name}`}
+                    text={room.promise?.text ?? annualText({ name: t.name, roomNumber: room.number, amount: room.annual.remaining, paid: room.annual.paid, partial: room.annual.partial, dueDate: room.annual.dueDate, daysUntilDue: room.annual.daysUntilDue, termLabel: room.annual.termLabel })} />
                   <AnnualPayButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, rent: room.annual.rent, remaining: room.annual.remaining, paid: room.annual.paid, partial: room.annual.partial, termLabel: room.annual.termLabel }} />
                   <PromiseButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, phone: t.phone,
                     year: termStart(room.annual).getUTCFullYear(), month: termStart(room.annual).getUTCMonth() + 1, current: room.promise }} />
@@ -195,11 +197,14 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
           ))}
 
           {owes && current && t && (
-            <div className="-mt-1 flex items-center justify-between gap-3">
+            <div className="-mt-1 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-ink-soft">
-                {room.promise ? <>Janji lunas <b className="num font-semibold text-ink">{formatDate(room.promise.date)}</b></> : "Minta tunda? Catat tanggal janjinya."}
+                {room.promise ? <>Janji lunas <b className="num font-semibold text-ink">{formatDate(room.promise.date)}</b></> : "Bayar kurang atau minta tunda?"}
               </p>
-              <PromiseButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, phone: t.phone, year: current.year, month: current.month, current: room.promise }} />
+              <span className="ml-auto flex flex-wrap justify-end gap-2">
+                <PartPayButton target={{ incomeId: current.id, roomNumber: room.number, tenantName: t.name, periodLabel: periodLabel(current.year, current.month), rent: room.monthlyRent, paid: current.amount }} />
+                <PromiseButton target={{ roomId: room.id, roomNumber: room.number, tenantName: t.name, phone: t.phone, year: current.year, month: current.month, current: room.promise }} />
+              </span>
             </div>
           )}
 
@@ -209,7 +214,15 @@ function RoomDrawer({ room, onClose }: { room: DrawerRoom | null; onClose: () =>
                 <div className="min-w-0"><dt className="eyebrow text-ink-soft">Masuk</dt><dd className="num mt-1 truncate font-medium">{t.moveInDate ? formatDate(t.moveInDate) : "Belum diisi"}</dd></div>
                 <div className="min-w-0"><dt className="eyebrow text-ink-soft">Kontrak sampai</dt><dd className="num mt-1 truncate font-medium">{t.leaseEndDate ? formatDate(t.leaseEndDate) : "Tanpa batas"}</dd></div>
               </dl>
-              {!owes && <div className="flex flex-wrap gap-2"><WaButton phone={t.phone} label={`Chat ${t.name}`} /></div>}
+              {!owes && (
+                <div className="flex flex-wrap gap-2">
+                  {current?.status === "LUNAS" && (
+                    <WaButton phone={t.phone} label="Kirim terima kasih"
+                      text={thanksText({ name: t.name, roomNumber: room.number, year: current.year, month: current.month, amount: current.amount })} />
+                  )}
+                  <WaButton phone={t.phone} label={`Chat ${t.name}`} />
+                </div>
+              )}
               {t.notes && <p className="rounded-[4px] border-[1.5px] border-dashed border-ink/40 px-4 py-3 text-sm break-words whitespace-pre-line">{t.notes}</p>}
             </>
           ) : (

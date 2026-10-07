@@ -17,6 +17,7 @@ import { TransferToggle } from "@/components/transfer-toggle";
 import { RoomDrawerProvider, RoomLink } from "@/components/room-drawer";
 import { CollectCard, type CollectItem } from "@/components/collect-card";
 import { PaidButton } from "@/components/paid-button";
+import { WaButton } from "@/components/ui";
 import { IconCheck, IconChevronRight } from "@/components/icons";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -36,7 +37,7 @@ export default async function DashboardPage() {
     }),
     db.reminder.count({ where: { isDone: false, dueDate: { lt: now } } }),
     dueReminders(now),
-    openPromises(),
+    openPromises(now),
     annualStates(now),
   ]);
 
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
     .map((r) => ({ id: r.id, number: r.room.number, paid: r.status === "LUNAS" }));
   const rentPaid = rentRooms.filter((r) => r.paid).length;
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR") ?? [];
-  const unpaidTotal = unpaid.reduce((s, r) => s + r.room.monthlyRent, 0);
+  const unpaidTotal = unpaid.reduce((s, r) => s + Math.max(0, r.room.monthlyRent - r.amount), 0);
   const pct = rentRooms.length ? Math.round((rentPaid / rentRooms.length) * 100) : 0;
 
   // Rent due today or already late, most late first. Rows in the current cash book can be marked paid here.
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
     .filter((r) => r.daysUntilDue <= 0)
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue || a.roomNumber - b.roomNumber)
     .map((r) => ({
-      roomId: r.roomId, roomNumber: r.roomNumber, tenant: properName(r.tenantName), phone: r.phone, amount: r.amount,
+      roomId: r.roomId, roomNumber: r.roomNumber, tenant: properName(r.tenantName), phone: r.phone, amount: r.amount, paid: r.paid,
       year: r.year, month: r.month, periodLabel: periodLabel(r.year, r.month),
       daysUntilDue: r.daysUntilDue, waHref: r.waHref, lapsedPromise: r.lapsedPromise,
       incomeId: r.kind === "monthly" && latest && r.year === latest.year && r.month === latest.month ? incomeByRoom.get(r.roomNumber) ?? null : null,
@@ -179,23 +180,28 @@ export default async function DashboardPage() {
                   const days = daysUntil(p.date, now);
                   const income = latest.roomIncomes.find((i) => i.roomId === r.id);
                   return (
-                    <li key={r.id} className="flex min-h-14 items-center gap-3 py-2">
-                      <span className="num grid h-10 w-10 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink bg-card text-sm font-medium" aria-hidden>{r.number}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{properName(r.tenant!.name)}</span>
-                        <span className="num text-xs">
-                          Janji {formatDate(p.date)} · <b className="font-semibold">{reminderDueLabel(days)}</b>
+                    <li key={r.id} className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 py-2">
+                      <span className="flex min-w-[10rem] flex-1 items-center gap-3">
+                        <span className="num grid h-10 w-10 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink bg-card text-sm font-medium" aria-hidden>{r.number}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{properName(r.tenant!.name)}</span>
+                          <span className="num text-xs">
+                            Janji {formatDate(p.date)} · <b className="font-semibold">{reminderDueLabel(days)}</b>
+                          </span>
                         </span>
                       </span>
-                      <PromiseButton label="Ubah"
-                        target={{ roomId: r.id, roomNumber: r.number, tenantName: properName(r.tenant!.name), phone: r.tenant!.phone,
-                          year: latest.year, month: latest.month, current: { id: p.id, date: p.date } }} />
-                      {income && income.status === "TUNDA_BAYAR" && <PaidButton incomeId={income.id} roomNumber={r.number} />}
+                      <span className="ml-auto flex items-center gap-2">
+                        {p.text && <WaButton iconOnly phone={r.tenant!.phone} text={p.text} label={`Kirim pengingat janji bayar ke ${properName(r.tenant!.name)}`} />}
+                        <PromiseButton label="Ubah"
+                          target={{ roomId: r.id, roomNumber: r.number, tenantName: properName(r.tenant!.name), phone: r.tenant!.phone,
+                            year: p.year, month: p.month, current: { id: p.id, date: p.date } }} />
+                        {income && income.status === "TUNDA_BAYAR" && <PaidButton incomeId={income.id} roomNumber={r.number} />}
+                      </span>
                     </li>
                   );
                 })}
               </ul>
-              <p className="mt-1 text-xs text-butter-deep">Tidak ditagih sampai tanggal janji; kamu diingatkan sehari sebelumnya dan pada harinya.</p>
+              <p className="mt-1 text-xs text-butter-deep">Tidak ditagih sampai tanggal janji; kamu diingatkan pada harinya. Ikon WhatsApp mengirim pengingat janjinya.</p>
             </section>
           )}
         </>

@@ -10,7 +10,7 @@ import { EXPENSE_META, IconBadge, taskCategoryMeta } from "./kit";
 import { Field, Sheet } from "./kit-client";
 import { AmountInput, ConfirmButton, SubmitButton } from "./forms";
 import { ReminderFields } from "./reminder-form";
-import { IconCheck, IconTrash, IconUndo } from "./icons";
+import { IconCheck, IconTrash, IconUndo, IconWhatsApp } from "./icons";
 
 export type ReminderItem = {
   id: string;
@@ -26,6 +26,7 @@ export type ReminderItem = {
   category: ExpenseCategory | null;
   isDone: boolean;
   doneAt: Date | null;
+  waHref?: string | null; // payment promises: the WhatsApp reminder to the tenant
 };
 
 const metaOf = (r: ReminderItem) => (r.category ? EXPENSE_META[r.category] : taskCategoryMeta(r.tag));
@@ -69,6 +70,12 @@ export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: {
                   </span>
                 </span>
               </button>
+              {r.waHref && (
+                <a href={r.waHref} target="_blank" rel="noopener noreferrer" aria-label={`Kirim pengingat WhatsApp: ${r.title}`} title="Kirim pengingat WhatsApp"
+                  className="press grid h-11 w-11 shrink-0 place-items-center rounded-[4px] border-[1.5px] border-ink bg-orange text-white shadow-[2px_2px_0_var(--color-ink)]">
+                  <IconWhatsApp width={20} height={20} />
+                </a>
+              )}
               {r.isDone ? <UndoButton id={r.id} title={r.title} /> : <DoneButton item={r} />}
             </li>
           );

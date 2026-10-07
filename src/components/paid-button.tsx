@@ -5,22 +5,26 @@ import { markRoomPaid, updateRoomIncome } from "@/app/actions";
 import { IconCheck } from "./icons";
 import { toast } from "./toast";
 
-// Marks a room's rent paid for the month, then offers Batalkan, which puts it back to unpaid.
+// Marks a room's rent paid for the month, then offers a WhatsApp thank-you to the tenant and
+// Batalkan, which puts it back to unpaid.
 export function PaidButton({ incomeId, roomNumber, className = "" }: { incomeId: string; roomNumber: number; className?: string }) {
   const [pending, start] = useTransition();
   const pay = () => start(async () => {
     const fd = new FormData();
     fd.set("incomeId", incomeId);
-    await markRoomPaid(fd);
-    toast(`Kamar ${roomNumber} ditandai lunas`, {
-      label: "Batalkan",
-      onClick: () => {
-        const undo = new FormData();
-        undo.set("incomeId", incomeId);
-        undo.set("status", "TUNDA_BAYAR");
-        void updateRoomIncome(undo);
+    const { thanksHref } = await markRoomPaid(fd);
+    toast(`Kamar ${roomNumber} lunas`, [
+      ...(thanksHref ? [{ label: "Terima kasih", href: thanksHref }] : []),
+      {
+        label: "Batalkan",
+        onClick: () => {
+          const undo = new FormData();
+          undo.set("incomeId", incomeId);
+          undo.set("status", "TUNDA_BAYAR");
+          void updateRoomIncome(undo);
+        },
       },
-    });
+    ]);
   });
   return (
     <button type="button" onClick={pay} disabled={pending} aria-label={`Tandai kamar ${roomNumber} lunas`} title="Tandai lunas"

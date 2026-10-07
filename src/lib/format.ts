@@ -159,11 +159,19 @@ export function daysBetween(from: Date, to: Date) {
 export type ReminderInput = {
   name: string;
   roomNumber: number;
-  amount: number;
+  amount: number; // the month's full rent
   year: number;
   month: number;
   dueDay: number | null;
+  paid?: number; // already received toward this month (bayar sebagian); the message asks for the rest
 };
+
+// "• Sudah dibayar / • Sisa" lines for a part-paid month, or the single "• Jumlah" line.
+function amountLines(total: number, paid = 0) {
+  return paid > 0
+    ? [`• Sewa: ${rupiah(total)}`, `• Sudah dibayar: ${rupiah(paid)}`, `• Sisa: *${rupiah(Math.max(0, total - paid))}*`]
+    : [`• Jumlah: *${rupiah(total)}*`];
+}
 
 // Sent to tenants over WhatsApp, so it stays in Indonesian. *bold* is WhatsApp formatting.
 // The opening line adapts to how far the due date is from `today` (before, on, or after it).
@@ -176,7 +184,7 @@ export function reminderText(r: ReminderInput, today: Date = todayJakarta()) {
   let opening: string;
   let dueLine: string;
   if (days === null) {
-    opening = `Kami ingin mengingatkan pembayaran sewa kamar untuk bulan ${period}.`;
+    opening = `Kami ingin mengingatkan ${r.paid ? "sisa " : ""}pembayaran sewa kamar untuk bulan ${period}.`;
     dueLine = "";
   } else if (days > 1) {
     opening = `Kami ingin mengingatkan bahwa sewa kamar akan jatuh tempo dalam ${days} hari.`;
@@ -188,7 +196,9 @@ export function reminderText(r: ReminderInput, today: Date = todayJakarta()) {
     opening = "Kami ingin mengingatkan bahwa *hari ini* adalah tanggal jatuh tempo sewa kamar.";
     dueLine = `• Jatuh tempo: *${dueLabel}*\n`;
   } else {
-    opening = `Kami ingin menginformasikan bahwa sewa kamar telah melewati jatuh tempo ${-days} hari dan kami belum menerima pembayarannya.`;
+    opening = r.paid
+      ? `Kami ingin menginformasikan bahwa sewa kamar telah melewati jatuh tempo ${-days} hari dan pembayarannya belum lunas.`
+      : `Kami ingin menginformasikan bahwa sewa kamar telah melewati jatuh tempo ${-days} hari dan kami belum menerima pembayarannya.`;
     dueLine = `• Jatuh tempo: ${dueLabel}\n`;
   }
 
@@ -201,7 +211,7 @@ export function reminderText(r: ReminderInput, today: Date = todayJakarta()) {
     "",
     `• Kamar: *${r.roomNumber}* (Kost Mujair 12)`,
     `• Periode: ${period}`,
-    `• Jumlah: *${rupiah(r.amount)}*`,
+    ...amountLines(r.amount, r.paid),
     ...(dueLine ? [dueLine.trimEnd()] : []),
     "",
     "Pembayaran dapat ditransfer ke:",
@@ -241,6 +251,56 @@ export function promiseText(p: { name: string; roomNumber: number; year: number;
     `a.n. ${PAYMENT_ACCOUNT.holder}`,
     "",
     "Terima kasih 🙏",
+  ].join("\n");
+}
+
+// What a rent payment is for, as it reads inside a message: "sewa *Kamar 3* bulan Oktober 2026",
+// or for yearly rent "sewa tahunan *Kamar 15* periode Okt 2026–Sep 2027".
+export type RentSubject = { roomNumber: number; year: number; month: number; annualTerm?: string | null };
+
+function rentSubject(s: RentSubject) {
+  return s.annualTerm
+    ? `sewa tahunan *Kamar ${s.roomNumber}* periode ${s.annualTerm}`
+    : `sewa *Kamar ${s.roomNumber}* bulan ${MONTHS_ID[s.month - 1]} ${s.year}`;
+}
+
+// WhatsApp reminder while a payment promise is open: ahead of the promised date, on it, or once it
+// has passed unpaid. The opening adapts like reminderText.
+export function promiseReminderText(p: RentSubject & { name: string; amount: number; paid?: number; date: Date }, today: Date = todayJakarta()) {
+  const name = properName(p.name);
+  const days = daysBetween(today, p.date);
+  const when = longDateId(p.date);
+  const what = rentSubject(p);
+  const opening = days > 1 ? `Kami ingin mengingatkan janji pembayaran ${what} yang akan dilunasi pada *${when}* (${days} hari lagi).`
+    : days === 1 ? `Kami ingin mengingatkan janji pembayaran ${what} yang akan dilunasi *besok*, ${when}.`
+    : days === 0 ? `Kami ingin mengingatkan bahwa *hari ini*, ${when}, adalah tanggal janji pelunasan ${what}.`
+    : `Kami ingin menginformasikan bahwa tanggal janji pelunasan ${what} (${when}) telah lewat ${-days} hari dan kami belum menerima pembayarannya.`;
+  return [
+    name ? `Assalamualaikum ${name},` : "Assalamualaikum,",
+    "",
+    opening,
+    "",
+    ...amountLines(p.amount, p.paid),
+    "",
+    "Pembayaran dapat ditransfer ke:",
+    `*Bank ${PAYMENT_ACCOUNT.bank} ${PAYMENT_ACCOUNT.number}*`,
+    `a.n. ${PAYMENT_ACCOUNT.holder}`,
+    "",
+    "Setelah transfer, mohon kirimkan bukti pembayaran di chat ini.",
+    ...(days < 0 ? ["Apabila ada kendala pembayaran, mohon segera kabari kami."] : []),
+    "",
+    "Terima kasih atas kerja samanya 🙏",
+    "Wassalamualaikum.",
+  ].join("\n");
+}
+
+// WhatsApp thank-you once a payment is confirmed received: one line, nothing else.
+export function thanksText(t: RentSubject & { name: string; amount: number }) {
+  const name = properName(t.name);
+  return [
+    name ? `Assalamualaikum ${name},` : "Assalamualaikum,",
+    "",
+    `Terima kasih, pembayaran ${rentSubject(t)} sebesar *${rupiah(t.amount)}* sudah kami terima. 🙏`,
   ].join("\n");
 }
 

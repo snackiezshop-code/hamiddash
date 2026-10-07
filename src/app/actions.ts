@@ -10,7 +10,7 @@ import { createPeriod, isLatestPeriod, recarryBalances } from "@/lib/cashbook";
 import { sendPushToAll } from "@/lib/push";
 import { dueReminders } from "@/lib/reminders";
 import {
-  CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, properName, todayJakarta,
+  CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, properName, thanksText, todayJakarta, waLink,
 } from "@/lib/format";
 import { PROMISE_TAG, REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
 import { addMonths, annualStates } from "@/lib/annual";
@@ -134,7 +134,8 @@ async function syncLatestIncome(roomId: string, status: RoomStatus, rent: number
 }
 
 function incomeAmountFor(status: RoomStatus, current: number, rent: number) {
-  if (status === "LUNAS") return current > 0 ? current : rent;
+  // Becoming Lunas from Belum bayar: a part payment so far tops up to the full rent.
+  if (status === "LUNAS") return Math.max(current, rent);
   if (status === "TAHUNAN") return current;
   return 0;
 }
@@ -184,11 +185,68 @@ export async function updateRoomIncome(form: FormData) {
   refresh();
 }
 
-export async function markRoomPaid(form: FormData) {
+// Returns the pre-filled WhatsApp thank-you for the tenant (null without a usable number).
+// A part-paid month becomes the full rent.
+export async function markRoomPaid(form: FormData): Promise<{ thanksHref: string | null }> {
   await requireAdmin();
+  const before = await db.roomIncome.findUniqueOrThrow({ where: { id: str(form, "incomeId") }, include: { room: true } });
   form.set("status", "LUNAS");
-  form.delete("amount");
+  form.set("amount", String(Math.max(before.amount, before.room.monthlyRent)));
   await updateRoomIncome(form);
+  const income = await db.roomIncome.findUnique({
+    where: { id: str(form, "incomeId") },
+    include: { room: { include: { tenant: true } }, period: true },
+  });
+  const tenant = income?.room.tenant;
+  if (!income || !tenant) return { thanksHref: null };
+  const text = thanksText({ name: tenant.name, roomNumber: income.room.number, year: income.period.year, month: income.period.month, amount: income.amount });
+  return { thanksHref: waLink(tenant.phone, text) };
+}
+
+// Part of a month's rent received ("bayar sebagian"). The room stays Belum bayar and reminders ask
+// for the rest; once the total reaches the rent it's Lunas. Returns what the toast needs to offer a
+// thank-you and Batalkan, or an error message.
+export async function recordRentPayment(form: FormData): Promise<{ thanksHref: string | null; remaining: number; prevAmount: number } | string> {
+  await requireAdmin();
+  const income = await db.roomIncome.findUnique({
+    where: { id: str(form, "incomeId") },
+    include: { room: { include: { tenant: true } }, period: true },
+  });
+  if (!income) return "Baris sewa itu sudah tidak ada.";
+  if (income.status !== "TUNDA_BAYAR") return "Kamar ini tidak sedang belum bayar.";
+  const amount = parseAmount(form.get("amount"));
+  if (amount <= 0) return "Isi jumlah lebih dari 0.";
+  const rent = income.room.monthlyRent;
+  const total = income.amount + amount;
+  const set = new FormData();
+  set.set("incomeId", income.id);
+  if (total >= rent) {
+    set.set("status", "LUNAS");
+    set.set("amount", String(total));
+    await updateRoomIncome(set);
+  } else {
+    await db.roomIncome.update({ where: { id: income.id }, data: { amount: total } });
+    await recarryBalances(income.period.year, income.period.month);
+    refresh();
+  }
+  const tenant = income.room.tenant;
+  const thanks = tenant && thanksText({ name: tenant.name, roomNumber: income.room.number, year: income.period.year, month: income.period.month, amount });
+  return { thanksHref: thanks ? waLink(tenant.phone, thanks) : null, remaining: Math.max(0, rent - total), prevAmount: income.amount };
+}
+
+// Batalkan for recordRentPayment: back to Belum bayar with what had been received before.
+export async function undoRentPayment(form: FormData) {
+  await requireAdmin();
+  const income = await db.roomIncome.findUniqueOrThrow({ where: { id: str(form, "incomeId") }, include: { period: true } });
+  if (income.status !== "TUNDA_BAYAR") {
+    const back = new FormData();
+    back.set("incomeId", income.id);
+    back.set("status", "TUNDA_BAYAR");
+    await updateRoomIncome(back);
+  }
+  await db.roomIncome.update({ where: { id: income.id }, data: { amount: parseAmount(form.get("amount")) } });
+  await recarryBalances(income.period.year, income.period.month);
+  refresh();
 }
 
 async function periodOf(periodId: string) {
@@ -233,7 +291,7 @@ async function removeIncome(id: string) {
 // Records a yearly-rent instalment in this month's cash book as Pemasukan lain. The first payment
 // toward a new term moves the term end forward 12 months; later ones pay off the rest of that term.
 // Returns the new row's id (for Batalkan) or an error message.
-export async function recordAnnualPayment(form: FormData): Promise<{ id: string } | string> {
+export async function recordAnnualPayment(form: FormData): Promise<{ id: string; thanksHref: string | null } | string> {
   await requireAdmin();
   const roomId = str(form, "roomId");
   const amount = parseAmount(form.get("amount"));
@@ -263,7 +321,11 @@ export async function recordAnnualPayment(form: FormData): Promise<{ id: string 
   }
   await recarryBalances(year, month);
   refresh();
-  return { id: row.id };
+  const thanks = thanksText({
+    name: state.tenantName, roomNumber: state.roomNumber, amount,
+    year: state.payTermStart.getUTCFullYear(), month: state.payTermStart.getUTCMonth() + 1, annualTerm: state.termLabel,
+  });
+  return { id: row.id, thanksHref: waLink(state.phone, thanks) };
 }
 
 export async function undoAnnualPayment(form: FormData) {
@@ -398,9 +460,9 @@ export async function savePaymentPromise(form: FormData) {
   const title = `Janji bayar · ${room.tenant ? properName(room.tenant.name) : "Penghuni"} · Kamar ${room.number}`;
   const open = await db.reminder.findFirst({ where: { tag: PROMISE_TAG, roomId: room.id, isDone: false } });
   if (open) {
-    await db.reminder.update({ where: { id: open.id }, data: { dueDate: date, title } });
+    await db.reminder.update({ where: { id: open.id }, data: { dueDate: date, title, remindBefore: 0 } });
   } else {
-    await db.reminder.create({ data: { title, tag: PROMISE_TAG, roomId: room.id, dueDate: date, remindBefore: 1 } });
+    await db.reminder.create({ data: { title, tag: PROMISE_TAG, roomId: room.id, dueDate: date, remindBefore: 0 } });
   }
   refresh();
 }

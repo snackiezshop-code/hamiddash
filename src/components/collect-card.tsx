@@ -16,7 +16,8 @@ export type CollectItem = {
   phone: string | null;
   year: number;
   month: number;
-  amount: number;
+  amount: number; // still owed
+  paid: number; // already received toward it (bayar sebagian)
   periodLabel: string;
   daysUntilDue: number; // 0 today, negative once late
   waHref: string | null;
@@ -46,7 +47,7 @@ export function CollectCard({ items }: { items: CollectItem[] }) {
           <p className="mt-2 text-2xl leading-tight font-medium tracking-[-0.01em] break-words">{item.tenant}</p>
           <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
             <Link href={`/kamar/${item.roomNumber}`} className="pill text-ink">Kamar {item.roomNumber}</Link>
-            <span className="num"><b className="font-semibold text-ink">{rupiah(item.amount)}</b> · {item.annual ? `${item.annual.partial ? "sisa sewa tahunan" : "sewa tahunan"} ${item.annual.termLabel}` : item.periodLabel}</span>
+            <span className="num">{item.paid > 0 && !item.annual && "sisa "}<b className="font-semibold text-ink">{rupiah(item.amount)}</b> · {item.annual ? `${item.annual.partial ? "sisa sewa tahunan" : "sewa tahunan"} ${item.annual.termLabel}` : item.periodLabel}</span>
             <span className={`font-medium ${item.daysUntilDue < 0 ? "text-orange-text" : "text-ink"}`}>{dueLabel(item.daysUntilDue)}</span>
           </p>
           {item.lapsedPromise && (

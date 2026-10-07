@@ -21,7 +21,7 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
     }),
     dueReminders(now),
     dueItems(now),
-    openPromises(),
+    openPromises(now),
   ]);
 
   const curYear = now.getUTCFullYear();
@@ -31,7 +31,8 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
   const slug = latest ? periodSlug(latest.year, latest.month) : periodSlug(curYear, curMonth);
 
   const overdueCount = rent.filter((r) => r.kind === "monthly" && r.daysUntilDue < 0).length;
-  // Rooms with a promise still ahead aren't chased; the promise itself alerts the day before and on the day.
+  // Rooms with a promise still ahead aren't chased; the promise itself alerts on its date.
+  const promiseById = new Map([...promises.values()].map((p) => [p.id, p]));
   const promisedAhead = (roomId: string) => { const p = promises.get(roomId); return Boolean(p && p.date >= now); };
   const unpaid = latest?.roomIncomes.filter((r) => r.status === "TUNDA_BAYAR" && !promisedAhead(r.roomId)) ?? [];
   const dueToday = unpaid.filter((r) => r.room.tenant?.reminderDay === now.getUTCDate());
@@ -47,12 +48,17 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
       detail: "Buku kas bulan ini belum dibuat",
       href: "/",
     }] : []),
-    ...items.map((i) => ({
-      id: `reminder-${i.id}`, tone: (i.daysUntilDue < 0 ? "blush" : "butter") as Notification["tone"],
-      title: i.amount ? `${i.title} · ${rupiah(i.amount)}` : i.title,
-      detail: `${reminderDueLabel(i.daysUntilDue)} (${formatDate(i.dueDate)}) · ketuk untuk menandai ${i.amount ? "dibayar" : "selesai"}`,
-      href: "/pengingat",
-    })),
+    // A payment promise opens the WhatsApp reminder about it; other reminders open Pengingat.
+    ...items.map((i) => {
+      const wa = promiseById.get(i.id)?.waHref;
+      return {
+        id: `reminder-${i.id}`, tone: (i.daysUntilDue < 0 ? "blush" : "butter") as Notification["tone"],
+        title: i.amount ? `${i.title} · ${rupiah(i.amount)}` : i.title,
+        detail: `${reminderDueLabel(i.daysUntilDue)} (${formatDate(i.dueDate)}) · ${wa ? "ketuk untuk mengirim pengingat WhatsApp" : `ketuk untuk menandai ${i.amount ? "dibayar" : "selesai"}`}`,
+        href: wa ?? "/pengingat",
+        external: Boolean(wa),
+      };
+    }),
     ...(overdueCount ? [{
       id: "overdue", tone: "blush" as const,
       title: `${overdueCount} penghuni lewat jatuh tempo`,
@@ -61,7 +67,7 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
     }] : []),
     // Opens the pre-filled WhatsApp reminder itself; without a usable number it falls back to the room.
     ...dueToday.map((inc) => {
-      const wa = waLink(inc.room.tenant?.phone, reminderText({ name: inc.room.tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, year: latest!.year, month: latest!.month, dueDay: inc.room.tenant?.reminderDay ?? null }, now));
+      const wa = waLink(inc.room.tenant?.phone, reminderText({ name: inc.room.tenant?.name ?? "", roomNumber: inc.room.number, amount: inc.room.monthlyRent, paid: inc.amount, year: latest!.year, month: latest!.month, dueDay: inc.room.tenant?.reminderDay ?? null }, now));
       return {
         id: `due-${inc.id}`, tone: "butter" as const,
         title: `Kirim pengingat · Kamar ${inc.room.number}`,
@@ -81,8 +87,8 @@ export async function getNotifications(now: Date = todayJakarta()): Promise<Noti
     })),
     ...unpaid.filter((inc) => !dueTodayIds.has(inc.id)).map((inc) => ({
       id: `unpaid-${inc.id}`, tone: "blush" as const,
-      title: `Kamar ${inc.room.number} belum bayar`,
-      detail: `${inc.room.tenant ? properName(inc.room.tenant.name) : "Tanpa nama"} · ${rupiah(inc.room.monthlyRent)} untuk ${label}`,
+      title: `Kamar ${inc.room.number} ${inc.amount > 0 ? "belum lunas" : "belum bayar"}`,
+      detail: `${inc.room.tenant ? properName(inc.room.tenant.name) : "Tanpa nama"} · ${inc.amount > 0 ? "sisa " : ""}${rupiah(Math.max(0, inc.room.monthlyRent - inc.amount))} untuk ${label}`,
       href: `/kas/${slug}`,
     })),
     ...endingLeases.map((r) => ({

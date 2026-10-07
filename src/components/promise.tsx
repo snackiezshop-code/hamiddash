@@ -46,7 +46,7 @@ export function PromiseButton({ target, className = "btn-secondary btn-sm", labe
           <div className="flex flex-col gap-4">
             <p className="text-sm">
               <b className="font-semibold">{t.tenantName}</b> (Kamar {t.roomNumber}) janji melunasi pada <b className="font-semibold">{longDateId(saved)}</b>.
-              Sampai tanggal itu kamar ini tidak masuk daftar tagih; kamu diingatkan sehari sebelumnya dan pada harinya.
+              Sampai tanggal itu kamar ini tidak masuk daftar tagih; kamu diingatkan pada harinya.
             </p>
             {confirmHref ? (
               <a href={confirmHref} target="_blank" rel="noopener noreferrer" className="btn w-full bg-orange text-white">

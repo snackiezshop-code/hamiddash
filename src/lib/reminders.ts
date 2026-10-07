@@ -3,6 +3,7 @@ import { db } from "./db";
 import { annualText, daysBetween, dueDateOf, reminderText, shiftMonth, todayJakarta, waLink } from "./format";
 import { annualStates } from "./annual";
 import { openPromises } from "./promises";
+import { PROMISE_TAG } from "./reminder-items";
 
 // Days before the due date that a reminder is flagged: 3 days ahead, then on the day itself.
 export const REMINDER_OFFSETS = [3, 0] as const;
@@ -17,7 +18,9 @@ export type DueReminder = {
   roomId: string;
   roomNumber: number;
   phone: string | null;
-  amount: number;
+  amount: number; // still owed: the rest of a part-paid month, or the full rent
+  paid: number; // already received toward it (bayar sebagian), 0 if nothing yet
+  incomeId: string | null; // the cash-book row, so a part payment can be recorded against it
   year: number;
   month: number;
   daysUntilDue: number; // negative once overdue
@@ -52,10 +55,10 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
     db.tenant.findMany({ where: { reminderDay: { not: null } }, include: { room: true } }),
     db.cashPeriod.findMany({
       where: { OR: months.map((m) => ({ year: m.year, month: m.month })) },
-      include: { roomIncomes: { select: { roomId: true, status: true } } },
+      include: { roomIncomes: { select: { id: true, roomId: true, status: true, amount: true } } },
     }),
     db.cashPeriod.findFirst({ orderBy: [{ year: "desc" }, { month: "desc" }], select: { year: true, month: true } }),
-    openPromises(),
+    openPromises(today),
     annualStates(today),
   ]);
   const latestYm = latest ? ym(latest.year, latest.month) : 0;
@@ -71,21 +74,25 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
       // Tenants who moved in after this month's due date never owed it.
       if (tenant.moveInDate && tenant.moveInDate > dueDateOf(m.year, m.month, tenant.reminderDay!)) continue;
       const room = tenant.room;
-      const owes = started
-        ? period!.roomIncomes.find((i) => i.roomId === room.id)?.status === "TUNDA_BAYAR"
-        : room.status === "LUNAS" || room.status === "TUNDA_BAYAR";
+      const income = started ? period!.roomIncomes.find((i) => i.roomId === room.id) : undefined;
+      const owes = started ? income?.status === "TUNDA_BAYAR" : room.status === "LUNAS" || room.status === "TUNDA_BAYAR";
       if (!owes) continue;
+      const paid = Math.min(income?.amount ?? 0, room.monthlyRent);
       // A promise to pay by a date that hasn't passed yet: don't chase this room until then.
       const promise = promises.get(room.id);
       if (promise && daysBetween(today, promise.date) >= 0) continue;
 
-      const text = reminderText({
-        name: tenant.name, roomNumber: room.number, amount: room.monthlyRent,
-        year: m.year, month: m.month, dueDay: tenant.reminderDay,
-      }, today);
+      // Past a promised date, the message is about the broken promise for the month it covered.
+      const text = promise?.text && !promise.annual && promise.year === m.year && promise.month === m.month
+        ? promise.text
+        : reminderText({
+          name: tenant.name, roomNumber: room.number, amount: room.monthlyRent, paid,
+          year: m.year, month: m.month, dueDay: tenant.reminderDay,
+        }, today);
       out.push({
         kind: "monthly", annual: null,
-        tenantName: tenant.name, roomId: room.id, roomNumber: room.number, phone: tenant.phone, amount: room.monthlyRent,
+        tenantName: tenant.name, roomId: room.id, roomNumber: room.number, phone: tenant.phone,
+        amount: room.monthlyRent - paid, paid, incomeId: income?.id ?? null,
         year: m.year, month: m.month, daysUntilDue: days,
         // A lapsed promise alerts through its own reminder, so the rent alert stays quiet (no double alert).
         alertToday: !promise && ((REMINDER_OFFSETS as readonly number[]).includes(days) || isOverdueAlertDay(-days)),
@@ -99,9 +106,9 @@ export async function dueReminders(today: Date = todayJakarta()): Promise<DueRem
     if (days > ANNUAL_LEAD_DAYS) continue;
     const promise = promises.get(a.roomId);
     if (promise && daysBetween(today, promise.date) >= 0) continue;
-    const text = annualText({ name: a.tenantName, roomNumber: a.roomNumber, amount: a.remaining, paid: a.paid, partial: a.partial, dueDate: a.dueDate, daysUntilDue: days, termLabel: a.termLabel });
+    const text = promise?.text ?? annualText({ name: a.tenantName, roomNumber: a.roomNumber, amount: a.remaining, paid: a.paid, partial: a.partial, dueDate: a.dueDate, daysUntilDue: days, termLabel: a.termLabel });
     out.push({
-      kind: "annual", tenantName: a.tenantName, roomId: a.roomId, roomNumber: a.roomNumber, phone: a.phone, amount: a.remaining,
+      kind: "annual", tenantName: a.tenantName, roomId: a.roomId, roomNumber: a.roomNumber, phone: a.phone, amount: a.remaining, paid: a.paid, incomeId: null,
       year: a.payTermStart.getUTCFullYear(), month: a.payTermStart.getUTCMonth() + 1, daysUntilDue: days,
       alertToday: !promise && (days === ANNUAL_LEAD_DAYS || days === 0 || isOverdueAlertDay(-days)),
       text, waHref: waLink(a.phone, text),
@@ -129,12 +136,13 @@ export type DueItem = {
 export async function dueItems(today: Date = todayJakarta()): Promise<DueItem[]> {
   const rows = await db.reminder.findMany({ where: { isDone: false, dueDate: { not: null } }, orderBy: { dueDate: "asc" } });
   return rows
-    .filter((r) => daysBetween(today, r.dueDate!) <= Math.max(REMINDER_OFFSETS[0], r.remindBefore))
+    // A payment promise only comes up on its date (and after, while unpaid), never ahead of it.
+    .filter((r) => daysBetween(today, r.dueDate!) <= (r.tag === PROMISE_TAG ? 0 : Math.max(REMINDER_OFFSETS[0], r.remindBefore)))
     .map((r) => {
       const days = daysBetween(today, r.dueDate!);
       return {
         id: r.id, title: r.title, amount: r.amount, dueDate: r.dueDate!, daysUntilDue: days,
-        alertToday: days === r.remindBefore || days === 0 || isOverdueAlertDay(-days),
+        alertToday: (r.tag !== PROMISE_TAG && days === r.remindBefore) || days === 0 || isOverdueAlertDay(-days),
       };
     });
 }

@@ -3,6 +3,7 @@ import { dueReminders, type DueReminder } from "@/lib/reminders";
 import { daysUntil, dueLabel } from "@/lib/reminder-items";
 import { formatDate, periodLabel, properName, rupiah, todayJakarta } from "@/lib/format";
 import { PromiseButton } from "@/components/promise";
+import { PartPayButton } from "@/components/part-pay";
 import { Empty, PageHeader, Section } from "@/components/ui";
 import { SegmentedLinks } from "@/components/kit-client";
 import { PushToggle } from "@/components/push-toggle";
@@ -11,6 +12,7 @@ import { QuickAddButton } from "@/components/quick-add";
 import { ReminderList, type ReminderItem } from "@/components/reminder-list";
 import { IconPlus, IconWhatsApp } from "@/components/icons";
 import { ensureCurrentPeriod } from "@/lib/cashbook";
+import { openPromises } from "@/lib/promises";
 
 // Rent to chase (computed from tenants) and your own reminders (bills, repairs, admin).
 // The daily push alert lands here.
@@ -20,7 +22,7 @@ export default async function RemindersPage({ searchParams }: PageProps<"/pengin
   const showDone = status === "done";
   const today = todayJakarta();
 
-  const [rent, rows, rooms, doneCount] = await Promise.all([
+  const [rent, rows, rooms, doneCount, promises] = await Promise.all([
     dueReminders(today),
     db.reminder.findMany({
       where: { isDone: showDone },
@@ -29,12 +31,15 @@ export default async function RemindersPage({ searchParams }: PageProps<"/pengin
     }),
     db.room.findMany({ orderBy: { number: "asc" }, select: { id: true, number: true } }),
     db.reminder.count({ where: { isDone: true } }),
+    openPromises(today),
   ]);
+  const promiseWa = new Map([...promises.values()].map((p) => [p.id, p.waHref]));
   const roomNo = new Map(rooms.map((r) => [r.id, r.number]));
   const items: ReminderItem[] = rows.map((r) => ({
     id: r.id, title: r.title, tag: r.tag, roomId: r.roomId, roomNumber: r.roomId ? roomNo.get(r.roomId) ?? null : null,
     dueDate: r.dueDate, daysUntilDue: daysUntil(r.dueDate, today), repeat: r.repeat, remindBefore: r.remindBefore,
     amount: r.amount, category: r.category, isDone: r.isDone, doneAt: r.doneAt,
+    waHref: r.isDone ? null : promiseWa.get(r.id) ?? null,
   }));
   const dueSoon = items.filter((r) => r.daysUntilDue !== null && r.daysUntilDue <= 1).length;
 
@@ -88,7 +93,7 @@ function RentList({ items }: { items: DueReminder[] }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">Kamar {r.roomNumber} · {properName(r.tenantName)}</div>
                 <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-soft">
-                  <span className="num">{rupiah(r.amount)} · {r.annual ? `${r.annual.partial ? "sisa sewa tahunan" : "sewa tahunan"} ${r.annual.termLabel}` : periodLabel(r.year, r.month)}</span>
+                  <span className="num">{r.paid > 0 && !r.annual ? "sisa " : ""}{rupiah(r.amount)} · {r.annual ? `${r.annual.partial ? "sisa sewa tahunan" : "sewa tahunan"} ${r.annual.termLabel}` : periodLabel(r.year, r.month)}</span>
                   <span className={`font-semibold ${late ? "text-orange-text" : "text-ink"}`}>{dueLabel(r.daysUntilDue)}</span>
                   {r.lapsedPromise && <span className="font-semibold text-orange-text">· janji lewat {formatDate(r.lapsedPromise.date)}</span>}
                 </div>
@@ -101,7 +106,11 @@ function RentList({ items }: { items: DueReminder[] }) {
                 <span className="text-xs text-ink-soft">Belum ada nomor WA</span>
               )}
             </div>
-            <div className="flex justify-end pl-14">
+            <div className="flex flex-wrap justify-end gap-2 pl-14">
+              {r.incomeId && (
+                <PartPayButton target={{ incomeId: r.incomeId, roomNumber: r.roomNumber, tenantName: properName(r.tenantName),
+                  periodLabel: periodLabel(r.year, r.month), rent: r.amount + r.paid, paid: r.paid }} />
+              )}
               <PromiseButton target={{ roomId: r.roomId, roomNumber: r.roomNumber, tenantName: properName(r.tenantName), phone: r.phone,
                 year: r.year, month: r.month, current: r.lapsedPromise }} label={r.lapsedPromise ? "Janji baru" : "Janji bayar"} />
             </div>

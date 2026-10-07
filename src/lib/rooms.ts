@@ -30,7 +30,7 @@ export function toDrawerRoom(r: RoomWithDrawerData, promises?: Map<string, OpenP
   const a = annual?.get(r.id);
   return {
     id: r.id, number: r.number, status: r.status, monthlyRent: r.monthlyRent,
-    promise: p ? { id: p.id, date: p.date } : null,
+    promise: p ? { id: p.id, date: p.date, text: p.text } : null,
     annual: a ? { rent: a.rent, remaining: a.remaining, paid: a.paid, partial: a.partial, termLabel: a.termLabel, termEnd: a.termEnd, dueDate: a.dueDate, daysUntilDue: a.daysUntilDue } : null,
     tenant: r.tenant && {
       name: properName(r.tenant.name), phone: r.tenant.phone, reminderDay: r.tenant.reminderDay,
