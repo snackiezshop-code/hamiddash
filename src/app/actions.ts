@@ -12,7 +12,7 @@ import { dueReminders } from "@/lib/reminders";
 import {
   CATEGORY_OPTIONS, STATUS_OPTIONS, formatDate, isFuturePeriod, parseAmount, periodLabel, periodSlug, properName, thanksText, todayJakarta, waLink,
 } from "@/lib/format";
-import { PROMISE_TAG, REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
+import { INCOME_TAG, PROMISE_TAG, REMIND_OPTIONS, REPEAT_OPTIONS, nextDueDate } from "@/lib/reminder-items";
 import { addMonths, annualStates } from "@/lib/annual";
 import type { ExpenseCategory, Repeat, RoomStatus } from "@/generated/prisma/enums";
 
@@ -66,6 +66,7 @@ export async function updateRoom(form: FormData) {
   const annualRent = parseAmount(form.get("annualRent")) || null;
   const tenantName = str(form, "tenantName");
 
+  const before = await db.room.findUniqueOrThrow({ where: { id: roomId } });
   await db.room.update({ where: { id: roomId }, data: { status, monthlyRent, annualRent } });
 
   if (tenantName) {
@@ -82,7 +83,7 @@ export async function updateRoom(form: FormData) {
     await db.tenant.deleteMany({ where: { roomId } });
   }
 
-  await syncLatestIncome(roomId, status, monthlyRent);
+  await syncLatestIncome(roomId, status, monthlyRent, before.monthlyRent);
   refresh();
   redirect("/kamar");
 }
@@ -122,15 +123,24 @@ export async function checkoutTenant(form: FormData) {
   refresh();
 }
 
-async function syncLatestIncome(roomId: string, status: RoomStatus, rent: number) {
+// Keeps the newest cash book's row in step with the room. A paid month whose amount was the old rent
+// follows a rent change; a tenant leaving after paying keeps that month's money in the cash book.
+async function syncLatestIncome(roomId: string, status: RoomStatus, rent: number, oldRent?: number) {
   const latest = await db.cashPeriod.findFirst({ orderBy: [{ year: "desc" }, { month: "desc" }] });
   if (!latest) return;
   const income = await db.roomIncome.findUnique({ where: { periodId_roomId: { periodId: latest.id, roomId } } });
-  if (!income || income.status === status) return;
-  await db.roomIncome.update({
-    where: { id: income.id },
-    data: { status, amount: incomeAmountFor(status, income.amount, rent) },
-  });
+  if (!income) return;
+  let amount = income.amount;
+  if (income.status === status) {
+    if (status !== "LUNAS" || oldRent === undefined || oldRent === rent || income.amount !== oldRent) return;
+    amount = rent;
+  } else if (status === "KOSONG" && income.status === "LUNAS") {
+    return;
+  } else {
+    amount = incomeAmountFor(status, income.amount, rent);
+  }
+  await db.roomIncome.update({ where: { id: income.id }, data: { status, amount } });
+  await recarryBalances(latest.year, latest.month);
 }
 
 function incomeAmountFor(status: RoomStatus, current: number, rent: number) {
@@ -428,15 +438,17 @@ function reminderData(form: FormData) {
   const amount = parseAmount(form.get("amount"));
   const category = str(form, "category") as ExpenseCategory;
   const remindBefore = Number(str(form, "remindBefore"));
+  // "Uang masuk" sits in the category picker but is stored as a tag: income has no expense category.
+  const income = str(form, "category") === INCOME_TAG;
   return {
     title: str(form, "title"),
-    tag: optStr(form, "tag"),
+    tag: income ? INCOME_TAG : optStr(form, "tag"),
     roomId: optStr(form, "roomId"),
     dueDate: optDate(form, "dueDate"),
     repeat: REPEAT_OPTIONS.includes(repeat) ? repeat : "NONE",
     remindBefore: REMIND_OPTIONS.includes(remindBefore) ? remindBefore : 1,
     amount: amount > 0 ? amount : null,
-    category: CATEGORY_OPTIONS.includes(category) ? category : amount > 0 ? "LAINNYA" : null,
+    category: income ? null : CATEGORY_OPTIONS.includes(category) ? category : amount > 0 ? "LAINNYA" : null,
   } as const;
 }
 
@@ -504,13 +516,15 @@ export async function completeReminder(_prev: string | null | undefined, form: F
     const month = today.getUTCMonth() + 1;
     const period = await db.cashPeriod.findUnique({ where: { year_month: { year, month } } });
     if (!period) return `Mulai buku kas ${periodLabel(year, month)} dulu.`;
-    const category = r.category ?? "LAINNYA";
-    await db.expense.create({
-      data: {
-        periodId: period.id, category, categoryLabel: category === "LAINNYA" ? r.title : null, amount: paid,
-        description: r.dueDate ? `${r.title} · jatuh tempo ${formatDate(r.dueDate)}` : r.title,
-      },
-    });
+    const description = reminderEntryDescription(r);
+    if (r.tag === INCOME_TAG) {
+      await db.additionalIncome.create({ data: { periodId: period.id, description, amount: paid } });
+    } else {
+      const category = r.category ?? "LAINNYA";
+      await db.expense.create({
+        data: { periodId: period.id, category, categoryLabel: category === "LAINNYA" ? r.title : null, amount: paid, description },
+      });
+    }
     await recarryBalances(year, month);
   }
   if (r.repeat !== "NONE" && r.dueDate) {
@@ -521,9 +535,31 @@ export async function completeReminder(_prev: string | null | undefined, form: F
   refresh();
 }
 
+// The cash-book line a reminder records when it's marked paid or received.
+function reminderEntryDescription(r: { title: string; dueDate: Date | null }) {
+  return r.dueDate ? `${r.title} · jatuh tempo ${formatDate(r.dueDate)}` : r.title;
+}
+
+// Batalkan on a done reminder also removes the expense or income its Dibayar/Diterima recorded, so
+// marking it again later doesn't count the money twice.
 export async function reopenReminder(form: FormData) {
   await requireAdmin();
-  await db.reminder.update({ where: { id: str(form, "id") }, data: { isDone: false, doneAt: null } });
+  const r = await db.reminder.findUniqueOrThrow({ where: { id: str(form, "id") } });
+  if (r.doneAt) {
+    const near = { gte: new Date(r.doneAt.getTime() - 60_000), lte: new Date(r.doneAt.getTime() + 60_000) };
+    const description = reminderEntryDescription(r);
+    const where = { description, createdAt: near };
+    const rows = [
+      ...(await db.expense.findMany({ where, include: { period: true } })).map((e) => ({ kind: "expense" as const, ...e })),
+      ...(await db.additionalIncome.findMany({ where, include: { period: true } })).map((e) => ({ kind: "income" as const, ...e })),
+    ];
+    for (const row of rows) {
+      if (row.kind === "expense") await db.expense.delete({ where: { id: row.id } });
+      else await db.additionalIncome.delete({ where: { id: row.id } });
+      await recarryBalances(row.period.year, row.period.month);
+    }
+  }
+  await db.reminder.update({ where: { id: r.id }, data: { isDone: false, doneAt: null } });
   refresh();
 }
 

@@ -2,7 +2,7 @@
 
 import type { ExpenseCategory, Repeat } from "@/generated/prisma/enums";
 import { CATEGORY_LABEL, CATEGORY_OPTIONS } from "@/lib/format";
-import { REMIND_OPTIONS, REPEAT_LABEL, REPEAT_OPTIONS, remindLabel } from "@/lib/reminder-items";
+import { INCOME_TAG, REMIND_OPTIONS, REPEAT_LABEL, REPEAT_OPTIONS, remindLabel } from "@/lib/reminder-items";
 import { TASK_CATEGORIES } from "./kit";
 import { DuePills, Field, SelectPill } from "./kit-client";
 import { AmountInput } from "./forms";
@@ -26,6 +26,7 @@ export function ReminderFields({ idPrefix, rooms, defaults = {} }: {
   rooms: { id: string; number: number }[];
   defaults?: ReminderDefaults;
 }) {
+  const income = defaults.tag === INCOME_TAG;
   return (
     <>
       <Field label="Yang perlu diingat" htmlFor={`${idPrefix}-title`}>
@@ -46,15 +47,19 @@ export function ReminderFields({ idPrefix, rooms, defaults = {} }: {
         </div>
         <div>
           <span className="label">Kategori buku kas</span>
-          <SelectPill name="category" ariaLabel="Kategori buku kas" defaultValue={defaults.category ?? ""}
-            options={[{ value: "", label: "Tidak ada" }, ...CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] }))]} />
+          <SelectPill name="category" ariaLabel="Kategori buku kas" defaultValue={income ? INCOME_TAG : defaults.category ?? ""}
+            options={[
+              { value: "", label: "Tidak ada" },
+              { value: INCOME_TAG, label: "Uang masuk" },
+              ...CATEGORY_OPTIONS.map((c) => ({ value: c, label: CATEGORY_LABEL[c] })),
+            ]} />
         </div>
         <Field label="Jumlah tetap" htmlFor={`${idPrefix}-amount`}>
           <AmountInput id={`${idPrefix}-amount`} name="amount" defaultValue={defaults.amount} placeholder="Rp" className="field num" />
         </Field>
       </div>
       <p className="-mt-2 text-xs text-ink-soft">
-        Dengan kategori, ini jadi tagihan: Dibayar menambahkannya ke pengeluaran bulan ini. Kosongkan jumlah kalau berubah tiap bulan; isi saat membayar.
+        Dengan kategori, ini jadi tagihan: Dibayar menambahkannya ke pengeluaran bulan ini. Pilih <b>Uang masuk</b> untuk uang yang diterima (misalnya menagih sesuatu): Diterima menambahkannya ke pemasukan lain. Sewa kurang bayar dicatat lewat Bayar sebagian di kamar.
       </p>
       <details className="group">
         <summary className="eyebrow inline-flex min-h-11 cursor-pointer items-center text-ink-soft hover:text-ink">
@@ -64,7 +69,7 @@ export function ReminderFields({ idPrefix, rooms, defaults = {} }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <span className="label">Jenis</span>
-              <SelectPill name="tag" ariaLabel="Jenis" defaultValue={defaults.tag ?? ""}
+              <SelectPill name="tag" ariaLabel="Jenis" defaultValue={income ? "" : defaults.tag ?? ""}
                 options={[{ value: "", label: "Tidak ada" }, ...TASK_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))]} />
             </div>
             <div>

@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { ExpenseCategory, Repeat } from "@/generated/prisma/enums";
 import { completeReminder, deleteReminder, reopenReminder, updateReminder } from "@/app/actions";
 import { dateInputValue, formatDate, rupiah } from "@/lib/format";
-import { REPEAT_LABEL, dueLabel } from "@/lib/reminder-items";
+import { INCOME_TAG, REPEAT_LABEL, dueLabel } from "@/lib/reminder-items";
 import { errorDetails, reportClientIssue } from "@/lib/client-log";
 import { EXPENSE_META, IconBadge, taskCategoryMeta } from "./kit";
 import { Field, Sheet } from "./kit-client";
@@ -90,8 +90,9 @@ export function ReminderList({ items, rooms }: { items: ReminderItem[]; rooms: {
 // A bill without a fixed amount (electricity, water) asks for this month's amount first.
 function DoneButton({ item }: { item: ReminderItem }) {
   const [asking, setAsking] = useState(false);
-  const isBill = Boolean(item.amount || item.category);
-  const label = isBill ? "Dibayar" : "Selesai";
+  const income = item.tag === INCOME_TAG;
+  const isBill = Boolean(item.amount || item.category || income);
+  const label = income ? "Diterima" : isBill ? "Dibayar" : "Selesai";
   const buttonClass = "btn-secondary btn-sm";
 
   if (isBill && !item.amount) {
@@ -124,7 +125,7 @@ function CompleteForm({ item, label, buttonClass }: { item: ReminderItem; label:
 function PaySheet({ item, open, onClose }: { item: ReminderItem; open: boolean; onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   return (
-    <Sheet open={open} onClose={onClose} title={`Bayar ${item.title}`}>
+    <Sheet open={open} onClose={onClose} title={item.tag === INCOME_TAG ? item.title : `Bayar ${item.title}`}>
       <form className="flex flex-col gap-4"
         action={async (fd) => {
           setError(null);
@@ -143,7 +144,7 @@ function PaySheet({ item, open, onClose }: { item: ReminderItem; open: boolean; 
             title="Isi jumlah lebih dari 0" placeholder="385.000" className="field num" />
         </Field>
         <p className="-mt-2 text-xs text-ink-soft">
-          Masuk ke pengeluaran bulan ini{item.repeat !== "NONE" ? `, lalu pengingat pindah ke tanggal berikutnya` : ""}.
+          Masuk ke {item.tag === INCOME_TAG ? "pemasukan lain" : "pengeluaran"} bulan ini{item.repeat !== "NONE" ? `, lalu pengingat pindah ke tanggal berikutnya` : ""}.
         </p>
         {error && <p role="alert" className="rounded-[4px] border-[1.5px] border-blush-deep bg-blush px-4 py-3 text-sm font-semibold text-blush-deep">{error}</p>}
         <SubmitButton className="btn-primary w-full" pendingText="Menyimpan…">Simpan pembayaran</SubmitButton>

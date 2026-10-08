@@ -9,6 +9,10 @@ import { daysBetween } from "./format";
 // paid closes it.
 export const PROMISE_TAG = "PROMISE";
 
+// Money coming in rather than going out (e.g. collecting something owed): marking it received records
+// it under Pemasukan lain instead of as an expense. Picked as "Uang masuk" in the cash book category.
+export const INCOME_TAG = "INCOME";
+
 export const REPEAT_OPTIONS: Repeat[] = ["NONE", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"];
 
 export const REPEAT_LABEL: Record<Repeat, string> = {
